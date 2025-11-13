@@ -1,0 +1,96 @@
+# .NET Core
+bin/
+obj/
+out/
+*.user
+*.suo
+*.cache
+*.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# Visual Studio
+.vs/
+.vscode/
+*.vsidx
+*.v2
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Configuration files with secrets
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Local.json
+**/appsettings.*.json
+
+# Keep only template files
+!appsettings.json.template
+!appsettings.Development.json.template
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Azure
+*.azureSettings.json
+*.publishsettings
+
+# Secrets
+secrets.json
+appsettings.secrets.json
+
+# User secrets
+**/Properties/launchSettings.json
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

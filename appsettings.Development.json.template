@@ -1,0 +1,40 @@
+{
+  "Logging": {
+    "LogLevel": {
+   "Default": "Debug",
+      "System": "Information",
+ "Microsoft": "Information",
+    "Microsoft.AspNetCore": "Warning",
+      "RagAgentApi.Agents": "Trace"
+    }
+  },
+  
+  "ApplicationInsights": {
+    "ConnectionString": "YOUR_APPLICATION_INSIGHTS_CONNECTION_STRING_DEV"
+  },
+  
+  "Azure": {
+    "OpenAI": {
+      "Endpoint": "YOUR_AZURE_OPENAI_ENDPOINT_DEV",
+      "Key": "YOUR_AZURE_OPENAI_KEY_DEV",
+   "EmbeddingDeployment": "text-embedding-ada-002",
+      "ChatDeployment": "gpt-35-turbo",
+      "ApiVersion": "2024-02-15-preview",
+      "MaxTokens": 8192,
+      "Temperature": 0.7
+    },
+    "Search": {
+      "Endpoint": "YOUR_AZURE_SEARCH_ENDPOINT_DEV",
+   "Key": "YOUR_AZURE_SEARCH_KEY_DEV",
+      "IndexName": "rag-agent-documents"
+    },
+    "Storage": {
+      "ConnectionString": "YOUR_AZURE_STORAGE_CONNECTION_STRING_DEV",
+   "ContainerName": "rag-documents"
+  },
+    "DocumentIntelligence": {
+      "Endpoint": "YOUR_AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT_DEV",
+      "Key": "YOUR_AZURE_DOCUMENT_INTELLIGENCE_KEY_DEV"
+  }
+  }
+}
