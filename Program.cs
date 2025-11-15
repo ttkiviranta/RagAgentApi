@@ -1,14 +1,33 @@
 using RagAgentApi.Agents;
 using RagAgentApi.Services;
 using RagAgentApi.Filters;
+using RagAgentApi.Data;
 using System.Reflection;
 using Microsoft.OpenApi.Models;
+using Microsoft.EntityFrameworkCore;
+using Pgvector.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add configuration sources
+builder.Configuration
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
+    .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true) // ← Henkilökohtaiset asetukset
+    .AddEnvironmentVariables();
 
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// PostgreSQL DbContext
+builder.Services.AddDbContext<RagDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("PostgreSQL"),
+        o => o.UseVector()
+    ));
+
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
@@ -49,13 +68,29 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IAzureOpenAIService, AzureOpenAIService>();
 builder.Services.AddSingleton<IAzureSearchService, AzureSearchService>();
 
+// PostgreSQL Services
+builder.Services.AddScoped<PostgresQueryService>();
+builder.Services.AddScoped<ConversationService>();
+builder.Services.AddScoped<AgentSelectorService>();
+builder.Services.AddScoped<AgentFactory>();
+builder.Services.AddScoped<DatabaseSeedService>();
+
 // Agents - Scoped for request lifecycle
 builder.Services.AddScoped<OrchestratorAgent>();
 builder.Services.AddScoped<ScraperAgent>();
 builder.Services.AddScoped<ChunkerAgent>();
 builder.Services.AddScoped<EmbeddingAgent>();
-builder.Services.AddScoped<StorageAgent>();
-builder.Services.AddScoped<QueryAgent>();
+builder.Services.AddScoped<StorageAgent>(); // Original Azure-based
+builder.Services.AddScoped<PostgresStorageAgent>(); // New PostgreSQL-based
+builder.Services.AddScoped<QueryAgent>(); // Original Azure-based
+builder.Services.AddScoped<PostgresQueryAgent>(); // New PostgreSQL-based
+
+// Specialized Agents (placeholders)
+builder.Services.AddScoped<GitHubApiAgent>();
+builder.Services.AddScoped<YouTubeTranscriptAgent>();
+builder.Services.AddScoped<ArxivScraperAgent>();
+builder.Services.AddScoped<NewsArticleScraperAgent>();
+
 
 // Orchestration - Singleton for thread state management
 builder.Services.AddSingleton<AgentOrchestrationService>();
@@ -150,18 +185,23 @@ _ = Task.Run(async () =>
 {
     try
     {
-        var scope = app.Services.CreateScope();
+      var scope = app.Services.CreateScope();
         var searchService = scope.ServiceProvider.GetRequiredService<IAzureSearchService>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-      
+  var seedService = scope.ServiceProvider.GetRequiredService<DatabaseSeedService>();
+  var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        
         logger.LogInformation("Initializing Azure Search index on startup...");
         await searchService.CreateOrUpdateIndexAsync();
         logger.LogInformation("Azure Search index initialized successfully");
+        
+   logger.LogInformation("Seeding agent types and URL mappings...");
+        await seedService.SeedAgentTypesAsync();
+        logger.LogInformation("Agent types seeding completed successfully");
     }
     catch (Exception ex)
- {
+    {
         var logger = app.Services.GetRequiredService<ILogger<Program>>();
-     logger.LogWarning(ex, "Failed to initialize Azure Search index on startup - will retry on first use");
+        logger.LogWarning(ex, "Failed to initialize services on startup - will retry on first use");
     }
 });
 

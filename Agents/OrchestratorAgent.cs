@@ -1,123 +1,338 @@
 using RagAgentApi.Models;
 using RagAgentApi.Services;
+using RagAgentApi.Data;
+using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace RagAgentApi.Agents;
 
 /// <summary>
-/// Orchestrates the execution of all other agents in the RAG pipeline
+/// Enhanced orchestrator agent that uses dynamic agent selection and specialized agents
 /// </summary>
 public class OrchestratorAgent : BaseRagAgent
 {
-    private readonly ScraperAgent _scraperAgent;
- private readonly ChunkerAgent _chunkerAgent;
-    private readonly EmbeddingAgent _embeddingAgent;
- private readonly StorageAgent _storageAgent;
-    private readonly AgentOrchestrationService _orchestrationService;
+    private readonly AgentSelectorService _agentSelectorService;
+private readonly AgentFactory _agentFactory;
+    private readonly RagDbContext _context;
 
     public OrchestratorAgent(
-       ScraperAgent scraperAgent,
-      ChunkerAgent chunkerAgent,
-    EmbeddingAgent embeddingAgent,
-     StorageAgent storageAgent,
-   AgentOrchestrationService orchestrationService,
- ILogger<OrchestratorAgent> logger) : base(logger)
+        AgentSelectorService agentSelectorService,
+        AgentFactory agentFactory,
+        RagDbContext context,
+   ILogger<OrchestratorAgent> logger) : base(logger)
     {
-        _scraperAgent = scraperAgent;
-        _chunkerAgent = chunkerAgent;
-    _embeddingAgent = embeddingAgent;
-        _storageAgent = storageAgent;
-_orchestrationService = orchestrationService;
-  }
+   _agentSelectorService = agentSelectorService;
+        _agentFactory = agentFactory;
+        _context = context;
+    }
 
     public override string Name => "OrchestratorAgent";
 
-    public override async Task<AgentResult> ExecuteAsync(AgentContext context, CancellationToken cancellationToken = default)
+ public override async Task<AgentResult> ExecuteAsync(AgentContext context, CancellationToken cancellationToken = default)
     {
-     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        LogExecutionStart(context.ThreadId);
+    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+    LogExecutionStart(context.ThreadId);
 
         try
         {
-            _logger.LogInformation("[Orchestrator] Starting pipeline for thread {ThreadId}", context.ThreadId);
+            // Validate required data in context
+ if (!context.State.TryGetValue("url", out var urlObj) || urlObj is not string url)
+         {
+            return AgentResult.CreateFailure("URL not found in context state");
+    }
 
-            // Step 1: Scrape content
-  AddMessage(context, _scraperAgent.Name, "Starting content scraping", new Dictionary<string, object>
- {
-                { "url", context.State.GetValueOrDefault("url", "") }
-   });
+            _logger.LogInformation("[OrchestratorAgent] Starting processing for URL: {Url}", url);
 
-     var scrapingResult = await _scraperAgent.ExecuteAsync(context, cancellationToken);
-  if (!scrapingResult.Success)
-       {
-           _logger.LogError("[Orchestrator] Scraping failed for thread {ThreadId}: {Error}", 
-         context.ThreadId, scrapingResult.Message);
-  return scrapingResult;
-       }
+      // Step 1: Select the appropriate agent type based on URL
+       var agentType = await _agentSelectorService.SelectAgentTypeAsync(url, cancellationToken);
+    
+            _logger.LogInformation("[OrchestratorAgent] Selected agent type: {AgentTypeName} for URL: {Url}", 
+       agentType.Name, url);
 
-       // Step 2: Chunk content
-     AddMessage(context, _chunkerAgent.Name, "Starting content chunking");
- 
-     var chunkingResult = await _chunkerAgent.ExecuteAsync(context, cancellationToken);
-       if (!chunkingResult.Success)
-      {
-  _logger.LogError("[Orchestrator] Chunking failed for thread {ThreadId}: {Error}", 
-   context.ThreadId, chunkingResult.Message);
-    return chunkingResult;
-       }
+         // Step 2: Create the agent pipeline based on agent type configuration
+     var pipeline = _agentFactory.CreatePipeline(agentType);
+       
+            _logger.LogInformation("[OrchestratorAgent] Created pipeline with {PipelineLength} agents: {AgentNames}", 
+     pipeline.Count, 
+      string.Join(" -> ", pipeline.Select(a => a.Name)));
 
-// Step 3: Generate embeddings
-   AddMessage(context, _embeddingAgent.Name, "Starting embedding generation");
+    // Step 3: Log pipeline execution start to database
+      var executionId = await LogPipelineStartAsync(Guid.Parse(context.ThreadId), agentType, pipeline, url, cancellationToken);
 
-    var embeddingResult = await _embeddingAgent.ExecuteAsync(context, cancellationToken);
-    if (!embeddingResult.Success)
-   {
-    _logger.LogError("[Orchestrator] Embedding failed for thread {ThreadId}: {Error}", 
-        context.ThreadId, embeddingResult.Message);
-      return embeddingResult;
-  }
+  // Step 4: Execute the pipeline sequentially
+            var pipelineResults = new List<AgentResult>();
+      var currentContext = context; // Pass context through the pipeline
 
-            // Step 4: Store in search index
-    AddMessage(context, _storageAgent.Name, "Starting document storage");
+    for (int i = 0; i < pipeline.Count; i++)
+            {
+      var agent = pipeline[i];
+       var stepNumber = i + 1;
 
-      var storageResult = await _storageAgent.ExecuteAsync(context, cancellationToken);
-   if (!storageResult.Success)
- {
-  _logger.LogError("[Orchestrator] Storage failed for thread {ThreadId}: {Error}", 
-      context.ThreadId, storageResult.Message);
-      return storageResult;
+        _logger.LogInformation("[OrchestratorAgent] Executing pipeline step {Step}/{Total}: {AgentName}", 
+    stepNumber, pipeline.Count, agent.Name);
+
+try
+          {
+           // Log individual agent execution start
+        var agentExecutionId = await LogAgentExecutionStartAsync(
+            executionId, agent.Name, currentContext, cancellationToken);
+
+      var agentResult = await agent.ExecuteAsync(currentContext, cancellationToken);
+       pipelineResults.Add(agentResult);
+
+         // Log individual agent execution completion
+          await LogAgentExecutionCompleteAsync(
+       agentExecutionId, agentResult, currentContext, cancellationToken);
+
+              if (!agentResult.Success)
+                  {
+_logger.LogError("[OrchestratorAgent] Pipeline failed at step {Step}: {AgentName} - {Error}", 
+        stepNumber, agent.Name, agentResult.Message);
+
+       // Log pipeline failure
+        await LogPipelineCompleteAsync(executionId, false, 
+      $"Pipeline failed at {agent.Name}: {agentResult.Message}", 
+    pipelineResults, cancellationToken);
+
+    return AgentResult.CreateFailure(
+       $"Pipeline execution failed at step {stepNumber} ({agent.Name}): {agentResult.Message}",
+          agentResult.Errors);
+   }
+
+           _logger.LogDebug("[OrchestratorAgent] Step {Step} completed successfully: {AgentName}", 
+         stepNumber, agent.Name);
+    }
+                catch (Exception ex)
+     {
+          _logger.LogError(ex, "[OrchestratorAgent] Exception in pipeline step {Step}: {AgentName}", 
+         stepNumber, agent.Name);
+
+       // Log pipeline failure
+      await LogPipelineCompleteAsync(executionId, false, 
+       $"Pipeline exception at {agent.Name}: {ex.Message}", 
+         pipelineResults, cancellationToken);
+
+            return AgentResult.CreateFailure(
+             $"Pipeline execution failed at step {stepNumber} ({agent.Name}): {ex.Message}");
+                }
+            }
+
+            stopwatch.Stop();
+
+            // Step 5: Log successful pipeline completion
+await LogPipelineCompleteAsync(executionId, true, "Pipeline completed successfully", 
+     pipelineResults, cancellationToken);
+
+ // Step 6: Prepare final result
+       var finalResult = CreateFinalResult(agentType, pipeline, pipelineResults, currentContext, stopwatch);
+
+            LogExecutionComplete(context.ThreadId, true, stopwatch.Elapsed);
+
+            _logger.LogInformation("[OrchestratorAgent] Pipeline completed successfully for URL: {Url} in {Duration}ms", 
+           url, stopwatch.ElapsedMilliseconds);
+
+            AddMessage(currentContext, "System", "Pipeline executed successfully",
+ new Dictionary<string, object>
+          {
+ { "agent_type", agentType.Name },
+       { "pipeline_length", pipeline.Count },
+         { "total_time_ms", stopwatch.ElapsedMilliseconds },
+       { "url", url }
+                });
+
+     return finalResult;
         }
-
-   // Update orchestration service
-      _orchestrationService.UpdateContext(context);
-
-            var chunksProcessed = context.State.ContainsKey("chunks") ? 
-  ((List<string>)context.State["chunks"]).Count : 0;
-
-   AddMessage(context, "System", "Pipeline completed successfully", new Dictionary<string, object>
-      {
-  { "chunks_processed", chunksProcessed }
-       });
-
-    stopwatch.Stop();
-         LogExecutionComplete(context.ThreadId, true, stopwatch.Elapsed);
-
-      _logger.LogInformation("[Orchestrator] Pipeline completed successfully for thread {ThreadId}. Processed {ChunkCount} chunks", 
-    context.ThreadId, chunksProcessed);
-
-  return AgentResult.CreateSuccess(
-"RAG pipeline completed successfully",
-     new Dictionary<string, object>
-   {
-  { "thread_id", context.ThreadId },
-              { "chunks_processed", chunksProcessed },
-     { "execution_time_ms", stopwatch.ElapsedMilliseconds }
-      });
-        }
- catch (Exception ex)
+        catch (Exception ex)
 {
             stopwatch.Stop();
-     LogExecutionComplete(context.ThreadId, false, stopwatch.Elapsed);
-    return HandleException(ex, context.ThreadId, "pipeline execution");
+            LogExecutionComplete(context.ThreadId, false, stopwatch.Elapsed);
+            return HandleException(ex, context.ThreadId, "orchestrated pipeline execution");
+    }
+    }
+
+    private async Task<Guid> LogPipelineStartAsync(
+        Guid threadId, 
+        Models.PostgreSQL.AgentType agentType, 
+   List<BaseRagAgent> pipeline, 
+        string url, 
+      CancellationToken cancellationToken)
+    {
+   try
+      {
+   var execution = new Models.PostgreSQL.AgentExecution
+ {
+   ThreadId = threadId,
+      AgentName = $"Pipeline_{agentType.Name}",
+    StartedAt = DateTime.UtcNow,
+     Status = "running",
+       InputData = JsonDocument.Parse(JsonSerializer.Serialize(new
+ {
+      agent_type = agentType.Name,
+      url = url,
+          pipeline_agents = pipeline.Select(a => a.Name).ToList(),
+       pipeline_length = pipeline.Count
+          }))
+  };
+
+   _context.AgentExecutions.Add(execution);
+   await _context.SaveChangesAsync(cancellationToken);
+
+            return execution.Id;
+        }
+      catch (Exception ex)
+        {
+         _logger.LogWarning(ex, "[OrchestratorAgent] Failed to log pipeline start, continuing without logging");
+            return Guid.NewGuid(); // Return dummy ID to continue execution
+ }
+    }
+
+    private async Task<Guid> LogAgentExecutionStartAsync(
+        Guid parentExecutionId,
+   string agentName,
+        AgentContext agentExecutionContext,
+        CancellationToken cancellationToken)
+    {
+        try
+      {
+            var execution = new Models.PostgreSQL.AgentExecution
+            {
+            ThreadId = Guid.Parse(agentExecutionContext.ThreadId),
+    AgentName = agentName,
+    ParentExecutionId = parentExecutionId,
+      StartedAt = DateTime.UtcNow,
+     Status = "running",
+        InputData = JsonDocument.Parse(JsonSerializer.Serialize(new
+     {
+     context_state_keys = agentExecutionContext.State.Keys.ToList(),
+  message_count = agentExecutionContext.Messages.Count
+ }))
+            };
+
+ _context.AgentExecutions.Add(execution);
+ await _context.SaveChangesAsync(cancellationToken);
+
+      return execution.Id;
+ }
+        catch (Exception ex)
+        {
+  _logger.LogWarning(ex, "[OrchestratorAgent] Failed to log agent execution start for {AgentName}", agentName);
+         return Guid.NewGuid();
+        }
+    }
+
+    private async Task LogAgentExecutionCompleteAsync(
+      Guid executionId,
+    AgentResult result,
+        AgentContext context,
+  CancellationToken cancellationToken)
+    {
+        try
+        {
+        var execution = await _context.AgentExecutions
+ .FirstOrDefaultAsync(e => e.Id == executionId, cancellationToken);
+
+  if (execution != null)
+  {
+    execution.CompletedAt = DateTime.UtcNow;
+                execution.DurationMs = (int)(execution.CompletedAt.Value - execution.StartedAt).TotalMilliseconds;
+       execution.Status = result.Success ? "success" : "failed";
+     execution.ErrorMessage = result.Success ? null : result.Message;
+     execution.OutputData = JsonDocument.Parse(JsonSerializer.Serialize(new
+{
+       success = result.Success,
+         message = result.Message,
+           data_keys = result.Data?.Keys.ToList() ?? new List<string>(),
+          context_state_keys = context.State.Keys.ToList(),
+          final_message_count = context.Messages.Count
+         }));
+
+await _context.SaveChangesAsync(cancellationToken);
+            }
+        }
+        catch (Exception ex)
+     {
+            _logger.LogWarning(ex, "[OrchestratorAgent] Failed to log agent execution completion for {ExecutionId}", executionId);
+        }
+    }
+
+    private async Task LogPipelineCompleteAsync(
+        Guid executionId,
+        bool success,
+    string message,
+        List<AgentResult> pipelineResults,
+    CancellationToken cancellationToken)
+    {
+try
+        {
+        var execution = await _context.AgentExecutions
+        .FirstOrDefaultAsync(e => e.Id == executionId, cancellationToken);
+
+      if (execution != null)
+            {
+        execution.CompletedAt = DateTime.UtcNow;
+       execution.DurationMs = (int)(execution.CompletedAt.Value - execution.StartedAt).TotalMilliseconds;
+            execution.Status = success ? "success" : "failed";
+                execution.ErrorMessage = success ? null : message;
+           execution.OutputData = JsonDocument.Parse(JsonSerializer.Serialize(new
+       {
+           success = success,
+   message = message,
+     pipeline_results = pipelineResults.Select((r, i) => new
+            {
+     step = i + 1,
+          success = r.Success,
+  message = r.Message,
+   execution_time_ms = r.Data?.GetValueOrDefault("execution_time_ms", 0)
+            }).ToList(),
+    total_steps = pipelineResults.Count,
+         successful_steps = pipelineResults.Count(r => r.Success)
+                }));
+
+     await _context.SaveChangesAsync(cancellationToken);
+            }
       }
+        catch (Exception ex)
+        {
+   _logger.LogWarning(ex, "[OrchestratorAgent] Failed to log pipeline completion for {ExecutionId}", executionId);
+  }
+    }
+
+    private static AgentResult CreateFinalResult(
+        Models.PostgreSQL.AgentType agentType,
+        List<BaseRagAgent> pipeline,
+        List<AgentResult> pipelineResults,
+        AgentContext context,
+  System.Diagnostics.Stopwatch stopwatch)
+    {
+ // Compile metrics from all pipeline steps
+     var metrics = new Dictionary<string, object>
+        {
+            { "agent_type", agentType.Name },
+  { "pipeline_agents", pipeline.Select(a => a.Name).ToList() },
+            { "pipeline_length", pipeline.Count },
+            { "total_execution_time_ms", stopwatch.ElapsedMilliseconds },
+  { "all_steps_successful", pipelineResults.All(r => r.Success) },
+       { "successful_steps", pipelineResults.Count(r => r.Success) },
+          { "step_results", pipelineResults.Select((r, i) => new
+             {
+           step = i + 1,
+       agent = pipeline[i].Name,
+  success = r.Success,
+         message = r.Message,
+        execution_time_ms = r.Data?.GetValueOrDefault("execution_time_ms", 0)
+        }).ToList() }
+        };
+
+        // Include final context state
+      if (context.State.TryGetValue("document_id", out var documentId))
+metrics["document_id"] = documentId;
+        if (context.State.TryGetValue("chunks_stored", out var chunksStored))
+        metrics["chunks_stored"] = chunksStored;
+if (context.State.TryGetValue("url", out var url))
+        metrics["processed_url"] = url;
+
+  return AgentResult.CreateSuccess(
+    $"Pipeline executed successfully using {agentType.Name}",
+     metrics);
     }
 }
