@@ -1,0 +1,29 @@
+<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-2">
+ <div class="flex items-start gap-2">
+        <span class="text-blue-500 text-sm">🔗</span>
+  <div class="flex-1 min-w-0">
+   <a href="@Url" target="_blank"
+          class="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium block truncate">
+          @Url
+      </a>
+        <div class="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+      @Content
+       </div>
+ <div class="flex items-center gap-2 mt-2">
+ <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+   <div class="bg-blue-500 h-1.5 rounded-full transition-all"
+         style="width: @(RelevanceScore * 100)%"></div>
+   </div>
+         <span class="text-xs text-gray-500">
+        @(Math.Round(RelevanceScore * 100))%
+         </span>
+      </div>
+    </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Url { get; set; } = string.Empty;
+    [Parameter] public string Content { get; set; } = string.Empty;
+    [Parameter] public double RelevanceScore { get; set; }
+}

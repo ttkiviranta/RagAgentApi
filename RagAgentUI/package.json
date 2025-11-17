@@ -1,0 +1,11 @@
+{
+  "name": "ragagentui",
+  "version": "1.0.0",
+  "scripts": {
+    "build:css": "npx tailwindcss -i ./Styles/app.css -o ./wwwroot/css/app.css --minify"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.1",
+    "tailwindcss": "^3.4.0"
+  }
+}

@@ -1,0 +1,248 @@
+﻿@page "/"
+@page "/chat"
+@using RagAgentUI.Services
+@using RagAgentUI.Models
+@using Microsoft.AspNetCore.Components.Web
+@inject RagApiClient ApiClient
+@inject ChatHubService ChatHub
+@implements IAsyncDisposable
+
+<div class="flex h-screen bg-white dark:bg-gray-900">
+    <!-- Sidebar -->
+   <ConversationList Conversations="@conversations"
+     SelectedConversationId="@currentConversationId"
+   OnConversationSelected="LoadConversation"
+    OnNewConversation="CreateNewConversation" />
+    
+    <!-- Main Chat Area -->
+   <div class="flex-1 flex flex-col">
+    <!-- Header -->
+    <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+     <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
+ RAG Agent Chat
+     </h1>
+
+ @if (!ChatHub.IsConnected)
+      {
+          <p class="text-sm text-yellow-600">⚠️ Real-time mode unavailable - using fallback</p>
+  }
+  </div>
+ 
+        <!-- Messages -->
+  <div class="flex-1 overflow-y-auto px-6 py-4" @ref="messageContainer">
+        @if (messages == null)
+ {
+  <div class="flex items-center justify-center h-full">
+<div class="text-gray-500">Loading conversation...</div>
+         </div>
+   }
+   else if (!messages.Any() && string.IsNullOrEmpty(streamingMessage))
+{
+          <div class="flex items-center justify-center h-full">
+           <div class="text-center">
+             <p class="text-gray-500 mb-4">No messages yet. Start a conversation!</p>
+       <p class="text-sm text-gray-400">Try asking about a GitHub repo, YouTube video, or any topic.</p>
+      </div>
+         </div>
+ }
+    else
+      {
+      @foreach (var message in messages)
+     {
+          <ChatMessage IsUser="@(message.Role == "user")"
+     Content="@message.Content"
+          CreatedAt="@message.CreatedAt"
+             Sources="@message.Sources" />
+      }
+   
+    @if (!string.IsNullOrEmpty(streamingMessage))
+           {
+             <ChatMessage IsUser="false"
+       Content="@streamingMessage"
+       CreatedAt="DateTime.Now" />
+     }
+               
+               @if (isStreaming)
+          {
+         <div class="flex justify-start mb-4">
+       <div class="bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3">
+      <div class="flex gap-1">
+  <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+         <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></span>
+              <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
+        </div>
+         </div>
+    </div>
+           }
+   }
+        </div>
+ 
+     <!-- Input -->
+        <div class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-6 py-4">
+   <div class="flex gap-3">
+     <input @bind="queryInput"
+ @bind:event="oninput"
+            @onkeydown="HandleKeyDown"
+         disabled="@isStreaming"
+    placeholder="Ask me anything..."
+            class="flex-1 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 
+            bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+      focus:outline-none focus:ring-2 focus:ring-blue-500 
+    disabled:opacity-50 disabled:cursor-not-allowed" />
+              
+          <button @onclick="SendQuery"
+      disabled="@(string.IsNullOrWhiteSpace(queryInput) || isStreaming)"
+        class="px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 
+       text-white rounded-lg font-medium transition-colors
+     disabled:cursor-not-allowed">
+     @(isStreaming ? "Sending..." : "Send")
+  </button>
+   </div>
+        
+  @if (!string.IsNullOrEmpty(errorMessage))
+        {
+  <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <p class="text-sm text-red-600">@errorMessage</p>
+      </div>
+    }
+   </div>
+    </div>
+</div>
+
+@code {
+  private List<ConversationDto>? conversations;
+    private List<MessageDto>? messages;
+private Guid? currentConversationId;
+    private string queryInput = string.Empty;
+    private bool isStreaming = false;
+   private string streamingMessage = string.Empty;
+    private ElementReference messageContainer;
+    private string errorMessage = string.Empty;
+    
+ protected override async Task OnInitializedAsync()
+    {
+  await ChatHub.ConnectAsync();
+   
+     ChatHub.OnMessageChunkReceived += async (chunk) =>
+    {
+    streamingMessage += chunk;
+            await InvokeAsync(StateHasChanged);
+       await ScrollToBottom();
+      };
+      
+     ChatHub.OnMessageComplete += async () =>
+     {
+    isStreaming = false;
+if (currentConversationId.HasValue)
+        {
+   await LoadConversation(currentConversationId.Value);
+    }
+            streamingMessage = string.Empty;
+          await InvokeAsync(StateHasChanged);
+        };
+      
+     ChatHub.OnError += async (error) =>
+{
+            errorMessage = error;
+            isStreaming = false;
+      await InvokeAsync(StateHasChanged);
+        };
+        
+     await LoadConversations();
+        
+ if (conversations?.Any() == true)
+      {
+  await LoadConversation(conversations.First().Id);
+   }
+    }
+  
+    private async Task LoadConversations()
+  {
+      conversations = await ApiClient.GetConversationsAsync();
+        StateHasChanged();
+   }
+    
+ private async Task LoadConversation(Guid conversationId)
+  {
+  currentConversationId = conversationId;
+messages = await ApiClient.GetConversationHistoryAsync(conversationId);
+    StateHasChanged();
+     await ScrollToBottom();
+    }
+    
+    private async Task CreateNewConversation()
+  {
+     var newConv = await ApiClient.CreateConversationAsync();
+      await LoadConversations();
+ await LoadConversation(newConv.Id);
+    }
+    
+    private async Task SendQuery()
+    {
+if (string.IsNullOrWhiteSpace(queryInput) || isStreaming) return;
+     
+        errorMessage = string.Empty;
+      
+      if (currentConversationId == null)
+     {
+      await CreateNewConversation();
+   }
+     
+    var query = queryInput;
+      queryInput = string.Empty;
+        
+ // Add user message immediately
+      messages?.Add(new MessageDto(Guid.NewGuid(), "user", query, DateTime.Now, null));
+        StateHasChanged();
+   await ScrollToBottom();
+    
+    isStreaming = true;
+     streamingMessage = string.Empty;
+   
+    try
+      {
+// Try SignalR streaming first
+            if (ChatHub.IsConnected)
+      {
+      await ChatHub.StreamQueryAsync(query, currentConversationId!.Value);
+      }
+       else
+      {
+      // Fallback to regular API
+       var response = await ApiClient.QueryAsync(currentConversationId!.Value, query);
+      messages?.Add(new MessageDto(Guid.NewGuid(), "assistant", response.Answer, DateTime.Now, response.Sources));
+   isStreaming = false;
+    StateHasChanged();
+          }
+        }
+        catch (Exception ex)
+ {
+   errorMessage = $"Error: {ex.Message}";
+          isStreaming = false;
+  StateHasChanged();
+        }
+}
+    
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+  {
+      if (e.Key == "Enter" && !e.ShiftKey)
+     {
+     await SendQuery();
+ }
+   }
+  
+    private async Task ScrollToBottom()
+  {
+        try
+      {
+    await Task.Delay(50);
+    await messageContainer.FocusAsync();
+        }
+ catch { }
+    }
+    
+  public async ValueTask DisposeAsync()
+    {
+  await ChatHub.DisposeAsync();
+  }
+}

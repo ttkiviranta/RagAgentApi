@@ -1,0 +1,60 @@
+@using RagAgentUI.Models
+
+<div class="w-64 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col h-screen">
+    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+        <button @onclick="CreateNewConversation"
+                class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+  <span>➕</span>
+   <span>New Chat</span>
+     </button>
+  </div>
+    
+ <div class="flex-1 overflow-y-auto p-2">
+      @if (Conversations == null)
+        {
+  <div class="text-center text-gray-500 mt-4">Loading...</div>
+        }
+      else if (!Conversations.Any())
+    {
+    <div class="text-center text-gray-500 mt-4 text-sm">No conversations yet</div>
+        }
+    else
+        {
+            @foreach (var conversation in Conversations)
+{
+     <button @onclick="() => OnConversationSelected.InvokeAsync(conversation.Id)"
+     class="w-full text-left p-3 rounded-lg mb-2 transition-colors
+             @(conversation.Id == SelectedConversationId ? 
+           "bg-blue-100 dark:bg-blue-900" : 
+           "hover:bg-gray-200 dark:hover:bg-gray-800")">
+  <div class="font-medium text-sm truncate">
+      @(conversation.Title ?? "Conversation")
+        </div>
+         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+           @conversation.MessageCount messages · @GetRelativeTime(conversation.LastMessageAt)
+       </div>
+      </button>
+ }
+ }
+   </div>
+</div>
+
+@code {
+[Parameter] public List<ConversationDto>? Conversations { get; set; }
+ [Parameter] public Guid? SelectedConversationId { get; set; }
+    [Parameter] public EventCallback<Guid> OnConversationSelected { get; set; }
+    [Parameter] public EventCallback OnNewConversation { get; set; }
+    
+    private async Task CreateNewConversation()
+    {
+      await OnNewConversation.InvokeAsync();
+    }
+ 
+    private string GetRelativeTime(DateTime dateTime)
+    {
+        var span = DateTime.UtcNow - dateTime;
+      if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes}m ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours}h ago";
+  return $"{(int)span.TotalDays}d ago";
+    }
+}
