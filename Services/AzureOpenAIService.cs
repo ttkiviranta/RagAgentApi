@@ -126,6 +126,75 @@ _logger.LogError(ex, "Failed to generate embedding for text of length {Length}",
         throw new InvalidOperationException($"Failed to get chat completion after {maxRetries} attempts");
     }
 
+    public async IAsyncEnumerable<string> GetChatCompletionStreamAsync(string userPrompt, string context, CancellationToken cancellationToken = default)
+    {
+        var systemPrompt = $@"You are a helpful AI assistant. Use the following context to answer the user's question.
+If the answer cannot be found in the context, say so clearly.
+
+Context:
+{context}
+
+Please provide a comprehensive answer based on the context above.";
+
+        var chatCompletionsOptions = new ChatCompletionsOptions()
+        {
+      DeploymentName = _config.ChatDeployment,
+  Messages =
+{
+           new ChatRequestSystemMessage(systemPrompt),
+      new ChatRequestUserMessage(userPrompt)
+      },
+    MaxTokens = _config.MaxTokens,
+  Temperature = _config.Temperature
+        };
+
+    IAsyncEnumerable<string> StreamContentAsync()
+    {
+        return StreamContentInternalAsync();
+    }
+
+    async IAsyncEnumerable<string> StreamContentInternalAsync()
+    {
+        bool errorOccurred = false;
+        string? errorMessage = null;
+        List<string> results = new();
+
+        try
+        {
+            var response = await _client.GetChatCompletionsStreamingAsync(chatCompletionsOptions, cancellationToken);
+
+            await foreach (var choice in response.WithCancellation(cancellationToken))
+            {
+                if (choice.ContentUpdate is not null)
+                {
+                    results.Add(choice.ContentUpdate);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get streaming chat completion");
+            errorOccurred = true;
+            errorMessage = $"Error: {ex.Message}";
+        }
+
+        foreach (var item in results)
+        {
+            yield return item;
+        }
+
+        if (errorOccurred && errorMessage is not null)
+        {
+            yield return errorMessage;
+        }
+    }
+
+    await foreach (var item in StreamContentAsync().WithCancellation(cancellationToken))
+    {
+        yield return item;
+    }
+}
+
     private class AzureOpenAIConfig
     {
         public string Endpoint { get; set; } = string.Empty;

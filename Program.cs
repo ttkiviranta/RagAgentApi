@@ -2,6 +2,7 @@ using RagAgentApi.Agents;
 using RagAgentApi.Services;
 using RagAgentApi.Filters;
 using RagAgentApi.Data;
+using RagAgentApi.Hubs;
 using System.Reflection;
 using Microsoft.OpenApi.Models;
 using Microsoft.EntityFrameworkCore;
@@ -14,12 +15,15 @@ builder.Configuration
     .SetBasePath(Directory.GetCurrentDirectory())
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
-    .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true) // ← Henkilökohtaiset asetukset
+    .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// Add SignalR
+builder.Services.AddSignalR();
 
 // PostgreSQL DbContext
 builder.Services.AddDbContext<RagDbContext>(options =>
@@ -34,11 +38,11 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "RAG Agent API",
         Version = "v1",
-      Description = "Multi-agent RAG system using Azure AI services for document ingestion and intelligent querying",
+        Description = "Multi-agent RAG system using Azure AI services for document ingestion and intelligent querying",
         Contact = new OpenApiContact
         {
             Name = "RAG Agent API",
-         Email = "support@ragagentapi.com"
+            Email = "support@ragagentapi.com"
         }
     });
 
@@ -51,13 +55,13 @@ builder.Services.AddSwaggerGen(options =>
     }
 
     // Add security definition for future authentication
-  options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-  Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
         Name = "Authorization",
         In = ParameterLocation.Header,
-  Type = SecuritySchemeType.ApiKey,
-      Scheme = "Bearer"
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
     });
 });
 
@@ -91,7 +95,6 @@ builder.Services.AddScoped<YouTubeTranscriptAgent>();
 builder.Services.AddScoped<ArxivScraperAgent>();
 builder.Services.AddScoped<NewsArticleScraperAgent>();
 
-
 // Orchestration - Singleton for thread state management
 builder.Services.AddSingleton<AgentOrchestrationService>();
 
@@ -110,8 +113,8 @@ if (!string.IsNullOrEmpty(appInsightsConnectionString) && appInsightsConnectionS
 {
     builder.Services.AddApplicationInsightsTelemetry(options =>
     {
-      options.ConnectionString = appInsightsConnectionString;
-  });
+        options.ConnectionString = appInsightsConnectionString;
+    });
 }
 
 // Logging configuration
@@ -124,22 +127,30 @@ if (!string.IsNullOrEmpty(appInsightsConnectionString) && appInsightsConnectionS
     builder.Logging.AddApplicationInsights(
         configureTelemetryConfiguration: (config) =>
         {
-     config.ConnectionString = appInsightsConnectionString;
+            config.ConnectionString = appInsightsConnectionString;
         },
-      configureApplicationInsightsLoggerOptions: (options) => { });
+        configureApplicationInsightsLoggerOptions: (options) => { });
 }
 
 // Set minimum log level
 builder.Logging.SetMinimumLevel(LogLevel.Information);
 
-// CORS configuration
+// CORS configuration for Blazor UI
 builder.Services.AddCors(options =>
 {
+    options.AddPolicy("AllowBlazorUI", policy =>
+    {
+        policy.WithOrigins("https://localhost:7170") // ← KORJATTU: UI:n HTTPS-portti
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // Required for SignalR
+    });
+
     options.AddDefaultPolicy(policy =>
     {
         policy.AllowAnyOrigin()
-         .AllowAnyMethod()
-     .AllowAnyHeader();
+              .AllowAnyMethod()
+              .AllowAnyHeader();
     });
 });
 
@@ -155,9 +166,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "RAG Agent API v1");
-     options.RoutePrefix = string.Empty; // Serve Swagger at root
+        options.RoutePrefix = string.Empty; // Serve Swagger at root
         options.DocumentTitle = "RAG Agent API";
-   options.DisplayRequestDuration();
+        options.DisplayRequestDuration();
     });
     app.UseDeveloperExceptionPage();
 }
@@ -169,13 +180,14 @@ else
 
 app.UseHttpsRedirection();
 
-app.UseCors();
+app.UseCors("AllowBlazorUI");
 
 app.UseRouting();
 
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ChatHub>("/chathub"); // SignalR hub mapping
 
 // Add health check endpoint
 app.MapHealthChecks("/health");
@@ -185,16 +197,16 @@ _ = Task.Run(async () =>
 {
     try
     {
-      var scope = app.Services.CreateScope();
+        var scope = app.Services.CreateScope();
         var searchService = scope.ServiceProvider.GetRequiredService<IAzureSearchService>();
-  var seedService = scope.ServiceProvider.GetRequiredService<DatabaseSeedService>();
-  var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        
+        var seedService = scope.ServiceProvider.GetRequiredService<DatabaseSeedService>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
         logger.LogInformation("Initializing Azure Search index on startup...");
         await searchService.CreateOrUpdateIndexAsync();
         logger.LogInformation("Azure Search index initialized successfully");
-        
-   logger.LogInformation("Seeding agent types and URL mappings...");
+
+        logger.LogInformation("Seeding agent types and URL mappings...");
         await seedService.SeedAgentTypesAsync();
         logger.LogInformation("Agent types seeding completed successfully");
     }
@@ -208,7 +220,7 @@ _ = Task.Run(async () =>
 // Log application startup
 var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
 startupLogger.LogInformation("RAG Agent API starting up...");
-startupLogger.LogInformation("Swagger UI available at: {SwaggerUrl}", 
+startupLogger.LogInformation("Swagger UI available at: {SwaggerUrl}",
     app.Environment.IsDevelopment() ? "https://localhost:7000" : "");
 
 app.Run();
@@ -226,31 +238,31 @@ public class ContextCleanupService : BackgroundService
     public ContextCleanupService(IServiceScopeFactory scopeFactory, ILogger<ContextCleanupService> logger)
     {
         _scopeFactory = scopeFactory;
-  _logger = logger;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-    while (!stoppingToken.IsCancellationRequested)
-    {
-    try
-  {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
                 using var scope = _scopeFactory.CreateScope();
- var orchestrationService = scope.ServiceProvider.GetRequiredService<AgentOrchestrationService>();
-           
- var cleanedCount = orchestrationService.CleanupOldContexts(_maxContextAge);
- 
-           if (cleanedCount > 0)
-           {
-                _logger.LogInformation("Cleaned up {Count} old agent contexts", cleanedCount);
-     }
+                var orchestrationService = scope.ServiceProvider.GetRequiredService<AgentOrchestrationService>();
+
+                var cleanedCount = orchestrationService.CleanupOldContexts(_maxContextAge);
+
+                if (cleanedCount > 0)
+                {
+                    _logger.LogInformation("Cleaned up {Count} old agent contexts", cleanedCount);
+                }
 
                 await Task.Delay(_cleanupInterval, stoppingToken);
-   }
-     catch (Exception ex)
-   {
-          _logger.LogError(ex, "Error during context cleanup");
-  await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken); // Retry after 5 minutes
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during context cleanup");
+                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken); // Retry after 5 minutes
             }
         }
     }

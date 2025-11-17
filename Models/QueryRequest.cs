@@ -8,6 +8,11 @@ namespace RagAgentApi.Models;
 public class QueryRequest
 {
     /// <summary>
+    /// Conversation ID for context
+    /// </summary>
+    public Guid ConversationId { get; set; }
+
+    /// <summary>
     /// Query text to search for
     /// </summary>
     [Required]

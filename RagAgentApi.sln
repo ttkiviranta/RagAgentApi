@@ -5,6 +5,8 @@ VisualStudioVersion = 17.14.36623.8
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgentApi", "RagAgentApi.csproj", "{1E38E2ED-7619-4C18-AE92-C63EABC0B160}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgentUI", "RagAgentUI\RagAgentUI.csproj", "{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,18 @@ Global
 		{1E38E2ED-7619-4C18-AE92-C63EABC0B160}.Release|x64.Build.0 = Release|Any CPU
 		{1E38E2ED-7619-4C18-AE92-C63EABC0B160}.Release|x86.ActiveCfg = Release|Any CPU
 		{1E38E2ED-7619-4C18-AE92-C63EABC0B160}.Release|x86.Build.0 = Release|Any CPU
+		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Debug|x64.Build.0 = Debug|Any CPU
+		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Debug|x86.Build.0 = Debug|Any CPU
+		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Release|x64.ActiveCfg = Release|Any CPU
+		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Release|x64.Build.0 = Release|Any CPU
+		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Release|x86.ActiveCfg = Release|Any CPU
+		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

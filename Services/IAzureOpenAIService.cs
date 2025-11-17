@@ -19,4 +19,9 @@ public interface IAzureOpenAIService
     /// Get chat completion response
     /// </summary>
     Task<string> GetChatCompletionAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get streaming chat completion response
+    /// </summary>
+    IAsyncEnumerable<string> GetChatCompletionStreamAsync(string userPrompt, string context, CancellationToken cancellationToken = default);
 }
