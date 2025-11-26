@@ -9,6 +9,10 @@ public record ConversationDto(
     int MessageCount
 );
 
+public record CreateConversationRequest(string? Title);
+
+public record CreateConversationResponse(Guid Id, string Title, DateTime CreatedAt);
+
 public record MessageDto(
     Guid Id,
     string Role,
@@ -16,8 +20,6 @@ public record MessageDto(
     DateTime CreatedAt,
     List<SourceDto>? Sources
 );
-
-public record CreateConversationResponse(Guid Id);
 
 // Query Response
 public record QueryResponse(

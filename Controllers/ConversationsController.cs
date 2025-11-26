@@ -12,7 +12,6 @@ public class ConversationsController : ControllerBase
 {
     private readonly RagDbContext _context;
     private readonly ILogger<ConversationsController> _logger;
-
     public ConversationsController(
         RagDbContext context,
         ILogger<ConversationsController> logger)
@@ -77,29 +76,25 @@ public class ConversationsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<CreateConversationResponse>> Create()
+    public async Task<ActionResult<CreateConversationResponse>> Create([FromBody] CreateConversationRequest? request)
     {
-        try
-        {
-            var conversation = new Conversation
-            {
-                Id = Guid.NewGuid(),
-                Title = "New Conversation",
-                CreatedAt = DateTime.UtcNow,
-                LastMessageAt = DateTime.UtcNow,
-                MessageCount = 0,
-                Status = "active"
-            };
+        var title = string.IsNullOrWhiteSpace(request?.Title)
+            ? $"Conversation {DateTime.UtcNow:yyyy-MM-dd HH:mm}"
+            : request.Title;
 
-            _context.Conversations.Add(conversation);
-            await _context.SaveChangesAsync();
-
-            return Ok(new CreateConversationResponse(conversation.Id));
-        }
-        catch (Exception ex)
+        var conversation = new Conversation
         {
-            _logger.LogError(ex, "Error creating conversation");
-            return StatusCode(500, "Error creating conversation");
-        }
+            Id = Guid.NewGuid(),
+            Title = title,  // ? KÄYTTÄJÄN ANTAMA TAI AUTOMAATTINEN!
+            Status = "active",
+            CreatedAt = DateTime.UtcNow,
+            LastMessageAt = DateTime.UtcNow,
+            MessageCount = 0
+        };
+
+        _context.Conversations.Add(conversation);
+        await _context.SaveChangesAsync();
+
+        return Ok(new CreateConversationResponse(conversation.Id, conversation.Title, conversation.CreatedAt));
     }
 }
