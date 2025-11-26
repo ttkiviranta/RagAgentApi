@@ -62,7 +62,6 @@ secrets.json
 appsettings.secrets.json
 
 # User secrets
-**/Properties/launchSettings.json
 
 # Logs
 logs
@@ -94,3 +93,4 @@ coverage
 .Trashes
 ehthumbs.db
 Thumbs.db
+node_modules/
