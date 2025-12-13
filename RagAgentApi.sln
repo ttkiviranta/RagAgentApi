@@ -1,11 +1,16 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.14.36623.8
+# Visual Studio Version 18
+VisualStudioVersion = 18.1.11304.174 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgentApi", "RagAgentApi.csproj", "{1E38E2ED-7619-4C18-AE92-C63EABC0B160}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgentUI", "RagAgentUI\RagAgentUI.csproj", "{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documents", "Documents", "{E121018A-7541-4A35-A596-894827CFE02A}"
+	ProjectSection(SolutionItems) = preProject
+		Documentation\API_Endpoints.md = Documentation\API_Endpoints.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

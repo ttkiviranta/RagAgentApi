@@ -140,7 +140,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowBlazorUI", policy =>
     {
-        policy.WithOrigins("https://localhost:7170") // ← KORJATTU: UI:n HTTPS-portti
+        policy.WithOrigins(
+                  "https://localhost:7170",  // Blazor UI
+                  "http://localhost:5173"    // Vue UI
+               ) 
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // Required for SignalR
