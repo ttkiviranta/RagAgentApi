@@ -119,6 +119,35 @@ cp appsettings.Development.json.template appsettings.Development.json
       "EmbeddingDeployment": "text-embedding-ada-002",
   "ChatDeployment": "gpt-35-turbo"
     }
+  },
+  "RagSettings": {
+    "Mode": "hybrid"
+  }
+}
+```
+
+### RAG Modes
+
+The API supports two operational modes for handling queries without document context:
+
+#### Hybrid Mode (Default: `"hybrid"`)
+- **With documents**: Uses RAG with document context
+- **Without documents**: Falls back to ChatGPT general knowledge
+- **Best for**: Interactive chatbots that should always provide helpful answers
+- **User experience**: Clearly indicates when answering without documents
+
+#### Strict Mode (`"strict"`)
+- **With documents**: Uses RAG with document context
+- **Without documents**: Returns error message requiring document ingestion
+- **Best for**: Applications requiring only fact-based answers from ingested documents
+- **User experience**: Ensures no hallucination or general knowledge mixing
+
+**Configuration:**
+```json
+{
+  "RagSettings": {
+    "Mode": "hybrid",  // or "strict"
+    "DefaultChunkSize": 1000
   }
 }
 ```

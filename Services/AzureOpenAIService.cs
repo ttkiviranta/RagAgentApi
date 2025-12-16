@@ -128,24 +128,43 @@ _logger.LogError(ex, "Failed to generate embedding for text of length {Length}",
 
     public async IAsyncEnumerable<string> GetChatCompletionStreamAsync(string userPrompt, string context, CancellationToken cancellationToken = default)
     {
-        var systemPrompt = $@"You are a helpful AI assistant. Use the following context to answer the user's question.
-If the answer cannot be found in the context, say so clearly.
+        // Build system prompt based on whether context is available
+        string systemPrompt;
+        
+        if (string.IsNullOrWhiteSpace(context))
+        {
+            // No context - use general ChatGPT knowledge
+            systemPrompt = @"You are a helpful AI assistant. Answer the user's question based on your general knowledge.
+Be concise, accurate, and helpful. If you're not certain about something, clearly state your level of confidence.
+Provide practical and useful information.";
+        }
+        else
+        {
+            // Context available - strict RAG mode
+            systemPrompt = $@"You are a helpful AI assistant that answers questions based ONLY on the provided context.
+
+IMPORTANT RULES:
+- Answer ONLY using information from the context below
+- If the context doesn't contain the answer, clearly state that you don't have that information
+- Do NOT use your general knowledge to answer questions
+- Be concise and cite specific parts of the context when relevant
 
 Context:
 {context}
 
-Please provide a comprehensive answer based on the context above.";
+Based solely on the context above, please answer the user's question.";
+        }
 
         var chatCompletionsOptions = new ChatCompletionsOptions()
         {
-      DeploymentName = _config.ChatDeployment,
-  Messages =
-{
-           new ChatRequestSystemMessage(systemPrompt),
-      new ChatRequestUserMessage(userPrompt)
-      },
-    MaxTokens = _config.MaxTokens,
-  Temperature = _config.Temperature
+            DeploymentName = _config.ChatDeployment,
+            Messages =
+            {
+                new ChatRequestSystemMessage(systemPrompt),
+                new ChatRequestUserMessage(userPrompt)
+            },
+            MaxTokens = _config.MaxTokens,
+            Temperature = _config.Temperature
         };
 
     IAsyncEnumerable<string> StreamContentAsync()

@@ -164,6 +164,22 @@ async function createConversation(title?: string) {
 
 Real-time streaming of AI responses (word-by-word like ChatGPT).
 
+**Important:** All JSON responses use camelCase property names (e.g., `relevanceScore`, not `RelevanceScore`).
+
+### RAG Modes
+
+The API supports two modes (configured in `appsettings.json` under `RagSettings:Mode`):
+
+#### 1. **Hybrid Mode** (Default: `"hybrid"`)
+- **With documents:** Uses document context (RAG) - prefixed with "?? Vastaus dokumenttien perusteella:"
+- **Without documents:** Falls back to ChatGPT general knowledge - prefixed with "?? Dokumenteista ei löytynyt tietoa. Vastaan yleisen tietämykseni perusteella:"
+- **Best for:** Interactive chatbot that always helps users
+
+#### 2. **Strict Mode** (`"strict"`)
+- **With documents:** Uses document context (RAG)
+- **Without documents:** Returns error message asking to ingest documents first
+- **Best for:** Applications requiring only fact-based answers from documents
+
 ### Connection Setup
 
 ```typescript
@@ -215,6 +231,11 @@ Streams AI-generated responses in real-time.
 **Parameters:**
 - `query` (string) - User's question
 - `conversationId` (UUID) - Target conversation ID
+
+**Behavior:**
+- If no documents are found in the database (empty vector store), returns a helpful message asking user to ingest documents first
+- If documents are found but relevance is too low (< 50% similarity), AI will state it cannot find relevant information
+- The AI will ONLY use information from retrieved documents, never general knowledge
 
 **Client Events:**
 
@@ -400,7 +421,9 @@ async function ingestDocument(url: string) {
 
 **POST** `/api/rag/query`
 
-Queries the RAG system without streaming (use SignalR for better UX).
+Queries the RAG system without streaming. **Note:** This endpoint now supports **hybrid mode** and uses PostgreSQL vector search.
+
+**Recommended:** Use SignalR `/chathub` for better user experience with real-time streaming.
 
 **Request Body:**
 ```json
@@ -411,10 +434,12 @@ Queries the RAG system without streaming (use SignalR for better UX).
 ```
 
 **Response (200 OK):**
+
+*With documents (Hybrid/Strict mode):*
 ```json
 {
   "query": "What are the key features of Semantic Kernel?",
-  "answer": "Semantic Kernel is an SDK that integrates LLMs...",
+  "answer": "?? Vastaus dokumenttien perusteella:\n\nSemantic Kernel is an SDK that integrates LLMs...",
   "sources": [
     {
       "url": "https://github.com/microsoft/semantic-kernel",
@@ -427,24 +452,38 @@ Queries the RAG system without streaming (use SignalR for better UX).
 }
 ```
 
----
-
-### 6. Health Check
-
-**GET** `/api/rag/health`
-
-Verifies API and dependency health.
-
-**Response (200 OK / 503 Unavailable):**
+*Without documents (Hybrid mode only):*
 ```json
 {
-  "status": "healthy",
-  "services": {
-    "azure_search": "ok",
-    "azure_openai": "ok"
-  },
-  "timestamp": "2025-12-13T14:30:00Z",
-  "version": "1.0.0"
+  "query": "What is Jyväskylä population?",
+  "answer": "?? Dokumenteista ei löytynyt tietoa. Vastaan yleisen tietämykseni perusteella:\n\nJyväskylä on Suomen...",
+  "sources": [],
+  "source_count": 0,
+  "processing_time_ms": 850
+}
+```
+
+*Without documents (Strict mode):*
+```json
+{
+  "query": "What is Jyväskylä population?",
+  "answer": "Kontekstissa ei ole tietoa tähän kysymykseen. Varmista että olet ensin ladannut dokumentteja järjestelmään käyttämällä 'Ingest Document' -toimintoa.",
+  "sources": [],
+  "source_count": 0,
+  "processing_time_ms": 450
+}
+```
+
+**Vue 3 Example:**
+```typescript
+async function queryWithFallback(query: string) {
+  const response = await fetch('https://localhost:7000/api/rag/query', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, topK: 5 })
+  });
+  
+  return await response.json();
 }
 ```
 

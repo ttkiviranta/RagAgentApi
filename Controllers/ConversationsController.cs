@@ -62,7 +62,11 @@ public class ConversationsController : ControllerBase
                 m.CreatedAt,
                 m.Sources != null
                     ? System.Text.Json.JsonSerializer.Deserialize<List<SourceDto>>(
-                        m.Sources.RootElement.GetRawText())
+                        m.Sources.RootElement.GetRawText(),
+                        new System.Text.Json.JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        })
                     : null
             )).ToList();
 

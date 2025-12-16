@@ -20,6 +20,7 @@ public class RagController : ControllerBase
     private readonly IAzureOpenAIService _openAIService;
     private readonly IAzureSearchService _searchService;
     private readonly ILogger<RagController> _logger;
+    private readonly IConfiguration _configuration;
 
     public RagController(
         OrchestratorAgent orchestratorAgent,
@@ -27,7 +28,8 @@ public class RagController : ControllerBase
         AgentOrchestrationService orchestrationService,
         IAzureOpenAIService openAIService,
         IAzureSearchService searchService,
-        ILogger<RagController> logger)
+        ILogger<RagController> logger,
+        IConfiguration configuration)
     {
         _orchestratorAgent = orchestratorAgent;
         _queryAgent = queryAgent;
@@ -35,6 +37,7 @@ public class RagController : ControllerBase
         _openAIService = openAIService;
         _searchService = searchService;
         _logger = logger;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -129,30 +132,84 @@ public class RagController : ControllerBase
 
             _logger.LogInformation("Processing query: '{Query}' with top-K {TopK}", request.Query, request.TopK);
 
-            // Create execution context for query
-            var context = _orchestrationService.CreateContext();
-            context.State["query"] = request.Query;
-            context.State["top_k"] = request.TopK;
+            // Get RAG mode configuration
+            var ragMode = _configuration.GetValue<string>("RagSettings:Mode", "hybrid")?.ToLower();
+            
+            // Get embedding for query
+            var queryEmbedding = await _openAIService.GetEmbeddingAsync(request.Query, cancellationToken);
+            
+            // Use PostgresQueryService for vector search
+            var postgresQueryService = HttpContext.RequestServices.GetRequiredService<PostgresQueryService>();
+            var searchResults = await postgresQueryService.SearchAsync(queryEmbedding, request.TopK, 0.5, cancellationToken);
 
-            // Execute query
-            var result = await _queryAgent.ExecuteAsync(context, cancellationToken);
+            string answer;
+            List<object> sources;
 
-            if (!result.Success)
+            if (!searchResults.Any())
             {
-                _logger.LogError("Query processing failed for thread {ThreadId}: {Error}", context.ThreadId, result.Message);
-                return StatusCode(500, CreateErrorResponse(result.Message, result.Errors, context.ThreadId));
+                _logger.LogWarning("[RagController] No documents found for query: '{Query}'", request.Query);
+                
+                if (ragMode == "strict")
+                {
+                    // Strict mode: error response
+                    answer = "Kontekstissa ei ole tietoa tähän kysymykseen. " +
+                            "Varmista että olet ensin ladannut dokumentteja järjestelmään käyttämällä 'Ingest Document' -toimintoa.";
+                    sources = new List<object>();
+                }
+                else
+                {
+                    // Hybrid mode: use general ChatGPT knowledge
+                    var systemPrompt = @"You are a helpful AI assistant. Answer the user's question based on your general knowledge.
+Be concise, accurate, and helpful. If you're not certain about something, clearly state your level of confidence.
+Provide practical and useful information.";
+                    
+                    answer = "?? Dokumenteista ei löytynyt tietoa. Vastaan yleisen tietämykseni perusteella:\n\n" +
+                            await _openAIService.GetChatCompletionAsync(systemPrompt, request.Query, cancellationToken);
+                    
+                    sources = new List<object>();
+                    
+                    _logger.LogInformation("[RagController] Generated answer using general knowledge (no context)");
+                }
+            }
+            else
+            {
+                // Documents found - use RAG
+                var context = string.Join("\n\n", searchResults.Select(r => r.Content));
+                
+                var systemPrompt = @"You are a helpful AI assistant that answers questions based ONLY on the provided context.
+
+IMPORTANT RULES:
+- Answer ONLY using information from the context below
+- If the context doesn't contain the answer, clearly state that you don't have that information
+- Do NOT use your general knowledge to answer questions
+- Be concise and cite specific parts of the context when relevant
+
+Context:
+" + context;
+
+                answer = "?? Vastaus dokumenttien perusteella:\n\n" +
+                        await _openAIService.GetChatCompletionAsync(systemPrompt, request.Query, cancellationToken);
+                
+                sources = searchResults.Select(r => new
+                {
+                    url = r.SourceUrl ?? "",
+                    content = r.Content.Length > 200 ? r.Content.Substring(0, 200) + "..." : r.Content,
+                    relevanceScore = Math.Round(r.RelevanceScore, 3)
+                }).ToList<object>();
+                
+                _logger.LogInformation("[RagController] Generated answer with {SourceCount} sources", sources.Count);
             }
 
             var response = new
             {
-                query = result.Data?.GetValueOrDefault("query", request.Query),
-                answer = result.Data?.GetValueOrDefault("answer", ""),
-                sources = result.Data?.GetValueOrDefault("sources", new List<object>()),
-                source_count = result.Data?.GetValueOrDefault("source_count", 0),
-                processing_time_ms = result.Data?.GetValueOrDefault("processing_time_ms", 0)
+                query = request.Query,
+                answer = answer,
+                sources = sources,
+                source_count = sources.Count,
+                processing_time_ms = 0 // Would need stopwatch
             };
 
-            _logger.LogInformation("Query processed successfully for thread {ThreadId}", context.ThreadId);
+            _logger.LogInformation("Query processed successfully");
             return Ok(response);
         }
         catch (Exception ex)
