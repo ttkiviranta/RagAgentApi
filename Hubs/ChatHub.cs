@@ -36,6 +36,14 @@ public class ChatHub : Hub
     {
         try
         {
+            // Get conversation at the beginning
+            var conversation = await _db.Conversations.FindAsync(conversationId);
+            if (conversation == null)
+            {
+                await Clients.Caller.SendAsync("ReceiveError", "Conversation not found");
+                return;
+            }
+            
             // Save user message
             var userMessage = new RagAgentApi.Models.PostgreSQL.Message
             {
@@ -47,15 +55,12 @@ public class ChatHub : Hub
             };
             
             _db.Messages.Add(userMessage);
-            await _db.SaveChangesAsync();
             
-            // Update conversation last message time
-            var conversation = await _db.Conversations.FindAsync(conversationId);
-            if (conversation != null)
-            {
-                conversation.LastMessageAt = DateTime.UtcNow;
-                await _db.SaveChangesAsync();
-            }
+            // Update conversation metadata for user message
+            conversation.LastMessageAt = DateTime.UtcNow;
+            conversation.MessageCount++;
+            
+            await _db.SaveChangesAsync();
             
             // Get embedding for query
             var queryEmbedding = await _openAI.GetEmbeddingAsync(query);
@@ -159,6 +164,11 @@ Be concise, accurate, and helpful. If you're not certain about something, say so
             };
             
             _db.Messages.Add(assistantMessage);
+            
+            // Update conversation metadata
+            conversation.MessageCount++; // Increment for assistant message
+            conversation.LastMessageAt = DateTime.UtcNow;
+            
             await _db.SaveChangesAsync();
             
             await Clients.Caller.SendAsync("ReceiveComplete");

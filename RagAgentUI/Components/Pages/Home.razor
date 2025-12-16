@@ -175,11 +175,29 @@
         ChatHub.OnMessageComplete += async () =>
         {
             isStreaming = false;
-            if (currentConversationId.HasValue)
+            
+            // Add the completed streaming message to messages list
+            if (!string.IsNullOrEmpty(streamingMessage) && currentConversationId.HasValue)
             {
-                await LoadConversation(currentConversationId.Value);
+                // Fetch only the latest assistant message from database
+                var history = await ApiClient.GetConversationHistoryAsync(currentConversationId.Value);
+                var latestAssistantMessage = history
+                    .Where(m => m.Role == "assistant")
+                    .OrderByDescending(m => m.CreatedAt)
+                    .FirstOrDefault();
+                
+                if (latestAssistantMessage != null && 
+                    !messages!.Any(m => m.Id == latestAssistantMessage.Id))
+                {
+                    messages!.Add(latestAssistantMessage);
+                }
             }
+            
             streamingMessage = string.Empty;
+            
+            // Reload conversations list to update message count
+            await LoadConversations();
+            
             await InvokeAsync(StateHasChanged);
         };
 
@@ -314,7 +332,4 @@
         await ChatHub.DisposeAsync();
     }
 }
-```
-
----
 
