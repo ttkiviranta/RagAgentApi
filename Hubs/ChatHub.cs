@@ -36,8 +36,10 @@ public class ChatHub : Hub
     {
         try
         {
-            // Get conversation at the beginning
-            var conversation = await _db.Conversations.FindAsync(conversationId);
+            // Get conversation at the beginning with tracking
+            var conversation = await _db.Conversations
+                .FirstOrDefaultAsync(c => c.Id == conversationId);
+                
             if (conversation == null)
             {
                 await Clients.Caller.SendAsync("ReceiveError", "Conversation not found");
@@ -59,6 +61,9 @@ public class ChatHub : Hub
             // Update conversation metadata for user message
             conversation.LastMessageAt = DateTime.UtcNow;
             conversation.MessageCount++;
+            
+            _logger.LogInformation("[ChatHub] Incremented MessageCount to {Count} for conversation {ConversationId}", 
+                conversation.MessageCount, conversationId);
             
             await _db.SaveChangesAsync();
             
@@ -165,9 +170,12 @@ Be concise, accurate, and helpful. If you're not certain about something, say so
             
             _db.Messages.Add(assistantMessage);
             
-            // Update conversation metadata
-            conversation.MessageCount++; // Increment for assistant message
+            // Update conversation metadata for assistant message
+            conversation.MessageCount++;
             conversation.LastMessageAt = DateTime.UtcNow;
+            
+            _logger.LogInformation("[ChatHub] Final MessageCount: {Count} for conversation {ConversationId}", 
+                conversation.MessageCount, conversationId);
             
             await _db.SaveChangesAsync();
             
