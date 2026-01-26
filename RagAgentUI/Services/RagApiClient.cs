@@ -8,12 +8,16 @@ public class RagApiClient
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly ILogger<RagApiClient> _logger;
 
-    public RagApiClient(HttpClient httpClient, IConfiguration configuration)
+    public RagApiClient(HttpClient httpClient, IConfiguration configuration, ILogger<RagApiClient> logger)
     {
         _httpClient = httpClient;
         _configuration = configuration;
+        _logger = logger;
         _httpClient.BaseAddress = new Uri(configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5000");
+
+        _logger.LogInformation("[RagApiClient] Initialized with BaseUrl: {BaseUrl}", _httpClient.BaseAddress);
 
         _jsonOptions = new JsonSerializerOptions
         {
@@ -47,26 +51,51 @@ public class RagApiClient
     {
         try
         {
+            _logger.LogInformation("[RagApiClient] GetConversationsAsync called");
+            _logger.LogInformation("[RagApiClient] Calling GET {Url}", $"{_httpClient.BaseAddress}api/conversations");
+            
             var response = await _httpClient.GetAsync("/api/conversations");
+            
+            _logger.LogInformation("[RagApiClient] Response status: {StatusCode}", response.StatusCode);
+            
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<List<ConversationDto>>(content, _jsonOptions) ?? new List<ConversationDto>();
+                _logger.LogInformation("[RagApiClient] Response content length: {Length}", content.Length);
+                _logger.LogDebug("[RagApiClient] Response content: {Content}", content);
+                
+                var conversations = JsonSerializer.Deserialize<List<ConversationDto>>(content, _jsonOptions) ?? new List<ConversationDto>();
+                _logger.LogInformation("[RagApiClient] Deserialized {Count} conversations", conversations.Count);
+                
+                return conversations;
             }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("[RagApiClient] Failed to get conversations. Status: {Status}, Content: {Content}", 
+                    response.StatusCode, errorContent);
+            }
+            
             return new List<ConversationDto>();
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "[RagApiClient] Exception in GetConversationsAsync");
             return new List<ConversationDto>();
         }
     }
 
     public async Task<CreateConversationResponse> CreateConversationAsync(string? title = null)
     {
+        _logger.LogInformation("[RagApiClient] CreateConversationAsync called with title: {Title}", title);
+        
         var request = new { Title = title };
         var response = await _httpClient.PostAsJsonAsync("/api/conversations", request);
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync();
+        
+        _logger.LogDebug("[RagApiClient] Create conversation response: {Content}", content);
+        
         return JsonSerializer.Deserialize<CreateConversationResponse>(content, _jsonOptions)
             ?? throw new Exception("Failed to deserialize response");
     }
@@ -75,16 +104,28 @@ public class RagApiClient
     {
         try
         {
+            _logger.LogInformation("[RagApiClient] GetConversationHistoryAsync called for {ConversationId}", conversationId);
+            
             var response = await _httpClient.GetAsync($"/api/conversations/{conversationId}");
+            
+            _logger.LogInformation("[RagApiClient] History response status: {StatusCode}", response.StatusCode);
+            
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<List<MessageDto>>(content, _jsonOptions) ?? new List<MessageDto>();
+                _logger.LogInformation("[RagApiClient] History response length: {Length}", content.Length);
+                
+                var messages = JsonSerializer.Deserialize<List<MessageDto>>(content, _jsonOptions) ?? new List<MessageDto>();
+                _logger.LogInformation("[RagApiClient] Deserialized {Count} messages", messages.Count);
+                
+                return messages;
             }
+            
             return new List<MessageDto>();
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "[RagApiClient] Exception in GetConversationHistoryAsync");
             return new List<MessageDto>();
         }
     }

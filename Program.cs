@@ -1,5 +1,6 @@
 using RagAgentApi.Agents;
 using RagAgentApi.Services;
+using RagAgentApi.Services.DemoServices;
 using RagAgentApi.Filters;
 using RagAgentApi.Data;
 using RagAgentApi.Hubs;
@@ -103,6 +104,12 @@ builder.Services.AddScoped<GitHubApiAgent>();
 builder.Services.AddScoped<YouTubeTranscriptAgent>();
 builder.Services.AddScoped<ArxivScraperAgent>();
 builder.Services.AddScoped<NewsArticleScraperAgent>();
+
+// Demo Services - Scoped for demo functionality
+builder.Services.AddScoped<ClassificationDemoService>();
+builder.Services.AddScoped<TimeSeriesDemoService>();
+builder.Services.AddScoped<ImageProcessingDemoService>();
+builder.Services.AddScoped<AudioProcessingDemoService>();
 
 // Orchestration - Singleton for thread state management
 builder.Services.AddSingleton<AgentOrchestrationService>();
