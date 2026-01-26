@@ -239,6 +239,70 @@ The system uses PostgreSQL with the following key tables:
 - **Conversations**: User conversation sessions
 - **Messages**: All messages with embeddings for similar query detection
 
+## 🎯 Demo Services
+
+The API includes **4 standalone demo services** for demonstrating AI/ML capabilities without affecting the RAG pipeline.
+
+### Available Demos
+- **Classification**: Text sentiment classification with 20 training samples
+- **Time-Series**: Forecasting and trend analysis with statistical metrics
+- **Image Processing**: Image generation and color analysis (256x256 PNG)
+- **Audio Processing**: Signal analysis with frequency detection (440Hz WAV)
+
+### Demo Endpoints
+
+```bash
+# Get available demos
+curl https://localhost:7000/api/demo/available
+
+# Generate test data
+curl -X POST https://localhost:7000/api/demo/generate-testdata?demoType=classification
+
+# Run demo
+curl -X POST https://localhost:7000/api/demo/run?demoType=classification
+```
+
+### Demo Results
+Each demo returns structured results with execution metrics:
+
+```json
+{
+  "demoType": "classification",
+  "success": true,
+  "message": "Classification demo completed successfully",
+  "data": {
+    "total_samples": 20,
+    "label_distribution": {"positive": 10, "negative": 10},
+    "model_accuracy": "92.00%",
+    "classes_found": ["positive", "negative"]
+  },
+  "executionTimeMs": "2ms"
+}
+```
+
+### Test Data Storage
+Generated demo files are stored in `demos/` directory:
+```
+demos/
+├── classification/data/classification_training.csv
+├── time-series/data/timeseries_data.csv
+├── image-processing/data/test_image.png
+└── audio-processing/data/test_audio.wav
+```
+
+### Testing Demo Services
+```powershell
+# Run comprehensive test suite
+./test-demo-api.ps1
+
+# Check API health
+./check-api-health.ps1
+```
+
+For detailed demo documentation, see [Documentation/DEMO_SERVICES.md](Documentation/DEMO_SERVICES.md)
+
+---
+
 ## 🧪 Testing & Development
 
 ### Available Test Endpoints
