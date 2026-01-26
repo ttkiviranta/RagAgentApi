@@ -9,6 +9,32 @@
 $API_BASE = "https://localhost:7000"
 $ErrorActionPreference = "Stop"
 
+# Disable SSL certificate validation for localhost development
+if (-not ([System.Management.Automation.PSTypeName]'ServerCertificateValidationCallback').Type) {
+    $certCallback = @"
+    using System;
+    using System.Net;
+    using System.Net.Security;
+    using System.Security.Cryptography.X509Certificates;
+    public class ServerCertificateValidationCallback
+    {
+        public static void Ignore()
+        {
+            if(ServicePointManager.ServerCertificateValidationCallback ==null)
+            {
+                ServicePointManager.ServerCertificateValidationCallback += 
+                    delegate (Object obj, X509Certificate certificate, X509Chain chain, SslPolicyErrors errors)
+                    {
+                        return true;
+                    };
+            }
+        }
+    }
+"@
+    Add-Type $certCallback
+}
+[ServerCertificateValidationCallback]::Ignore()
+
 function Write-Section {
     param([string]$Title)
     Write-Host "`n" -ForegroundColor Green
@@ -21,8 +47,7 @@ function Invoke-ApiRequest {
     param(
         [string]$Method,
         [string]$Endpoint,
-        [object]$Body = $null,
-        [bool]$SkipCertCheck = $true
+        [object]$Body = $null
     )
     
     $url = "$API_BASE$Endpoint"
@@ -32,7 +57,6 @@ function Invoke-ApiRequest {
         Uri             = $url
         Method          = $Method
         ContentType     = "application/json"
-        SkipCertificateCheck = $SkipCertCheck
     }
     
     if ($Body -and $Method -eq "POST") {
@@ -40,15 +64,14 @@ function Invoke-ApiRequest {
     }
     
     try {
-        $response = Invoke-RestMethod @params
+        $response = Invoke-RestMethod @params -ErrorAction Stop
         Write-Host "? Response (200 OK)" -ForegroundColor Green
         return $response
     }
     catch {
         Write-Host "? Error: $($_.Exception.Message)" -ForegroundColor Red
-        if ($_.Exception.Response) {
-            $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-            Write-Host "Response: $($reader.ReadToEnd())" -ForegroundColor Yellow
+        if ($_.Exception.InnerException) {
+            Write-Host "   Inner Error: $($_.Exception.InnerException.Message)" -ForegroundColor Yellow
         }
         throw
     }
