@@ -61,7 +61,7 @@ SELECT
     "DemoType",
     COUNT(*) as "Runs",
     SUM(CASE WHEN "Success" THEN 1 ELSE 0 END) as "Success Count",
-    ROUND(AVG(CAST("ExecutionTimeMs" AS FLOAT)), 2) as "Avg Time (ms)",
+    ROUND(AVG("ExecutionTimeMs")::numeric, 2) as "Avg Time (ms)",
     MIN("ExecutionTimeMs") as "Min Time",
     MAX("ExecutionTimeMs") as "Max Time"
 FROM "DemoExecutions"
@@ -91,7 +91,7 @@ SELECT
     COUNT(*) as "Total Runs",
     SUM(CASE WHEN "Success" THEN 1 ELSE 0 END) as "Successful Runs",
     ROUND(
-        SUM(CASE WHEN "Success" THEN 1 ELSE 0 END) * 100.0 / COUNT(*),
+        (SUM(CASE WHEN "Success" THEN 1 ELSE 0 END)::numeric * 100.0 / COUNT(*)),
         2
     ) as "Success Rate %"
 FROM "DemoExecutions"
