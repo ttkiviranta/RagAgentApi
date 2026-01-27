@@ -290,6 +290,26 @@ demos/
 └── audio-processing/data/test_audio.wav
 ```
 
+### Test Data Repository Pattern
+
+Demo services now support **flexible, configurable data sourcing**:
+
+- **Local Files** (default): Fast access, development-friendly
+- **PostgreSQL**: Persistent storage, history tracking, analytics
+- **Hybrid**: Both simultaneously for maximum flexibility
+
+**Configuration:**
+```json
+{
+  "DemoSettings": {
+    "DataSource": "local",  // "local" or "postgres"
+    "LocalDataPath": "demos/",
+    "SaveResults": true,
+    "ResultRetentionDays": 30
+  }
+}
+```
+
 ### Testing Demo Services
 ```powershell
 # Run comprehensive test suite
@@ -299,7 +319,9 @@ demos/
 ./check-api-health.ps1
 ```
 
-For detailed demo documentation, see [Documentation/DEMO_SERVICES.md](Documentation/DEMO_SERVICES.md)
+For detailed demo documentation, see:
+- [Documentation/DEMO_SERVICES.md](Documentation/DEMO_SERVICES.md) - Demo Services Overview
+- [Documentation/DEMO_REPOSITORY_PATTERN.md](Documentation/DEMO_REPOSITORY_PATTERN.md) - Repository Pattern Details
 
 ---
 
