@@ -21,6 +21,10 @@ public class RagDbContext : DbContext
     public DbSet<AgentExecution> AgentExecutions { get; set; }
     public DbSet<AgentType> AgentTypes { get; set; }
     public DbSet<UrlAgentMapping> UrlAgentMappings { get; set; }
+    
+    // Demo Services
+    public DbSet<DemoExecution> DemoExecutions { get; set; }
+    public DbSet<DemoTestData> DemoTestData { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -200,5 +204,34 @@ public class RagDbContext : DbContext
       .HasForeignKey(e => e.AgentTypeId)
          .OnDelete(DeleteBehavior.Cascade);
       });
+
+        // Configure DemoExecution entity
+        modelBuilder.Entity<DemoExecution>(entity =>
+        {
+            entity.HasIndex(e => e.DemoType)
+                .HasDatabaseName("IX_DemoExecutions_DemoType");
+
+            entity.HasIndex(e => e.CreatedAt)
+                .HasDatabaseName("IX_DemoExecutions_CreatedAt");
+
+            entity.HasIndex(e => new { e.DemoType, e.CreatedAt })
+                .HasDatabaseName("IX_DemoExecutions_DemoType_CreatedAt");
+
+            entity.Property(e => e.ResultData)
+                .HasColumnType("jsonb");
+        });
+
+        // Configure DemoTestData entity
+        modelBuilder.Entity<DemoTestData>(entity =>
+        {
+            entity.HasIndex(e => e.DemoType)
+                .HasDatabaseName("IX_DemoTestData_DemoType");
+
+            entity.HasIndex(e => e.CreatedAt)
+                .HasDatabaseName("IX_DemoTestData_CreatedAt");
+
+            entity.HasIndex(e => e.ContentHash)
+                .HasDatabaseName("IX_DemoTestData_ContentHash");
+        });
   }
 }

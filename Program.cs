@@ -111,6 +111,17 @@ builder.Services.AddScoped<TimeSeriesDemoService>();
 builder.Services.AddScoped<ImageProcessingDemoService>();
 builder.Services.AddScoped<AudioProcessingDemoService>();
 
+// Demo Data Repository - Configurable data source
+var demoDataSource = builder.Configuration.GetValue<string>("DemoSettings:DataSource", "local").ToLower();
+if (demoDataSource == "postgres")
+{
+    builder.Services.AddScoped<ITestDataRepository, PostgresRepository>();
+}
+else
+{
+    builder.Services.AddScoped<ITestDataRepository, LocalFileRepository>();
+}
+
 // Orchestration - Singleton for thread state management
 builder.Services.AddSingleton<AgentOrchestrationService>();
 
