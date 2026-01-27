@@ -25,7 +25,7 @@
                         <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
                             @GetDemoTitle(demo)
                         </h2>
-                        <span class="text-2xl">@GetDemoEmoji(demo)</span>
+                        <span class="inline-block bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-sm font-medium">@GetDemoType(demo)</span>
                     </div>
 
                     <p class="text-gray-600 dark:text-gray-400 mb-4">
@@ -43,7 +43,7 @@
                             }
                             else
                             {
-                                <span>?? Generate Test Data</span>
+                                <span>Generate Test Data</span>
                             }
                         </button>
 
@@ -57,7 +57,7 @@
                             }
                             else
                             {
-                                <span>?? Run Demo</span>
+                                <span>Run Demo</span>
                             }
                         </button>
 
@@ -67,7 +67,7 @@
                             var result = Results[demo];
                             <div class="mt-4 p-3 rounded-lg @(result.Success ? "bg-green-50 dark:bg-green-900" : "bg-red-50 dark:bg-red-900")">
                                 <p class="text-sm font-medium @(result.Success ? "text-green-800 dark:text-green-200" : "text-red-800 dark:text-red-200")">
-                                    @(result.Success ? "?" : "?") @result.Message
+                                    @(result.Success ? "[OK]" : "[ERROR]") @result.Message
                                 </p>
                                 <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
                                     Execution time: @result.ExecutionTimeMs
@@ -251,6 +251,15 @@
         _ => demoType
     };
 
+    private string GetDemoType(string demoType) => demoType switch
+    {
+        "classification" => "TEXT",
+        "time-series" => "DATA",
+        "image" => "IMAGE",
+        "audio" => "AUDIO",
+        _ => "DEMO"
+    };
+
     private string GetDemoDescription(string demoType) => demoType switch
     {
         "classification" => "Text sentiment classification with machine learning models",
@@ -258,15 +267,6 @@
         "image" => "Image generation and color analysis processing",
         "audio" => "Signal analysis with frequency detection and audio metrics",
         _ => "Demo service for AI/ML testing"
-    };
-
-    private string GetDemoEmoji(string demoType) => demoType switch
-    {
-        "classification" => "???",
-        "time-series" => "??",
-        "image" => "???",
-        "audio" => "??",
-        _ => "??"
     };
 
     public class DemoResult
