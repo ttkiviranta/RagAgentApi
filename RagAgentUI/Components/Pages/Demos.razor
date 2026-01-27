@@ -1,0 +1,280 @@
+@page "/demos"
+@using RagAgentUI.Services
+@using RagAgentUI.Models
+@using System.Text.Json
+@inject RagApiClient ApiClient
+@inject ILogger<Demos> Logger
+
+<div class="p-8 max-w-6xl mx-auto">
+    <h1 class="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Demo Services</h1>
+    <p class="text-gray-600 dark:text-gray-400 mb-8">Test AI/ML capabilities without affecting the RAG pipeline</p>
+
+    @if (!IsLoaded)
+    {
+        <div class="flex items-center justify-center h-64">
+            <div class="text-gray-500">Loading demos...</div>
+        </div>
+    }
+    else
+    {
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            @foreach (var demo in AvailableDemos)
+            {
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                            @GetDemoTitle(demo)
+                        </h2>
+                        <span class="text-2xl">@GetDemoEmoji(demo)</span>
+                    </div>
+
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">
+                        @GetDemoDescription(demo)
+                    </p>
+
+                    <div class="space-y-3">
+                        <!-- Generate Test Data -->
+                        <button @onclick="() => GenerateTestData(demo)"
+                                disabled="@(IsGeneratingData.Contains(demo))"
+                                class="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                            @if (IsGeneratingData.Contains(demo))
+                            {
+                                <span>? Generating...</span>
+                            }
+                            else
+                            {
+                                <span>?? Generate Test Data</span>
+                            }
+                        </button>
+
+                        <!-- Run Demo -->
+                        <button @onclick="() => RunDemo(demo)"
+                                disabled="@(IsRunning.Contains(demo))"
+                                class="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                            @if (IsRunning.Contains(demo))
+                            {
+                                <span>? Running...</span>
+                            }
+                            else
+                            {
+                                <span>?? Run Demo</span>
+                            }
+                        </button>
+
+                        <!-- Status -->
+                        @if (Results.ContainsKey(demo))
+                        {
+                            var result = Results[demo];
+                            <div class="mt-4 p-3 rounded-lg @(result.Success ? "bg-green-50 dark:bg-green-900" : "bg-red-50 dark:bg-red-900")">
+                                <p class="text-sm font-medium @(result.Success ? "text-green-800 dark:text-green-200" : "text-red-800 dark:text-red-200")">
+                                    @(result.Success ? "?" : "?") @result.Message
+                                </p>
+                                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                    Execution time: @result.ExecutionTimeMs
+                                </p>
+                                @if (result.Data != null)
+                                {
+                                    <details class="mt-2">
+                                        <summary class="text-xs font-medium cursor-pointer">View Results</summary>
+                                        <pre class="mt-2 text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded overflow-auto max-h-64">@JsonSerializer.Serialize(result.Data, new JsonSerializerOptions { WriteIndented = true })</pre>
+                                    </details>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Summary -->
+        @if (Results.Count > 0)
+        {
+            <div class="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Summary</h3>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="text-center">
+                        <p class="text-3xl font-bold text-blue-500">@Results.Count</p>
+                        <p class="text-gray-600 dark:text-gray-400">Total Runs</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-3xl font-bold text-green-500">@Results.Values.Count(r => r.Success)</p>
+                        <p class="text-gray-600 dark:text-gray-400">Successful</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-3xl font-bold text-red-500">@Results.Values.Count(r => !r.Success)</p>
+                        <p class="text-gray-600 dark:text-gray-400">Failed</p>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<string> AvailableDemos = new();
+    private HashSet<string> IsRunning = new();
+    private HashSet<string> IsGeneratingData = new();
+    private Dictionary<string, DemoResult> Results = new();
+    private bool IsLoaded = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadAvailableDemos();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading available demos");
+        }
+    }
+
+    private async Task LoadAvailableDemos()
+    {
+        try
+        {
+            // This would call an endpoint that returns available demos
+            // For now, use hardcoded list that matches DemoController
+            AvailableDemos = new List<string> { "classification", "time-series", "image", "audio" };
+            IsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading demos");
+        }
+    }
+
+    private async Task GenerateTestData(string demoType)
+    {
+        try
+        {
+            IsGeneratingData.Add(demoType);
+            StateHasChanged();
+
+            using var httpClient = new HttpClient { BaseAddress = new Uri("https://localhost:7000") };
+            var response = await httpClient.PostAsync($"/api/demo/generate-testdata?demoType={demoType}", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = new DemoResult
+                {
+                    DemoType = demoType,
+                    Success = true,
+                    Message = $"Test data generated successfully for {GetDemoTitle(demoType)}",
+                    ExecutionTimeMs = "~1s"
+                };
+                Results[demoType] = result;
+            }
+            else
+            {
+                Results[demoType] = new DemoResult
+                {
+                    DemoType = demoType,
+                    Success = false,
+                    Message = "Failed to generate test data",
+                    ExecutionTimeMs = "0ms"
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error generating test data");
+            Results[demoType] = new DemoResult
+            {
+                DemoType = demoType,
+                Success = false,
+                Message = ex.Message,
+                ExecutionTimeMs = "0ms"
+            };
+        }
+        finally
+        {
+            IsGeneratingData.Remove(demoType);
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunDemo(string demoType)
+    {
+        try
+        {
+            IsRunning.Add(demoType);
+            StateHasChanged();
+
+            using var httpClient = new HttpClient { BaseAddress = new Uri("https://localhost:7000") };
+            var response = await httpClient.PostAsync($"/api/demo/run?demoType={demoType}", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<DemoResult>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (result != null)
+                {
+                    Results[demoType] = result;
+                }
+            }
+            else
+            {
+                Results[demoType] = new DemoResult
+                {
+                    DemoType = demoType,
+                    Success = false,
+                    Message = "API request failed",
+                    ExecutionTimeMs = "0ms"
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error running demo");
+            Results[demoType] = new DemoResult
+            {
+                DemoType = demoType,
+                Success = false,
+                Message = ex.Message,
+                ExecutionTimeMs = "0ms"
+            };
+        }
+        finally
+        {
+            IsRunning.Remove(demoType);
+            StateHasChanged();
+        }
+    }
+
+    private string GetDemoTitle(string demoType) => demoType switch
+    {
+        "classification" => "Classification",
+        "time-series" => "Time-Series Analysis",
+        "image" => "Image Processing",
+        "audio" => "Audio Processing",
+        _ => demoType
+    };
+
+    private string GetDemoDescription(string demoType) => demoType switch
+    {
+        "classification" => "Text sentiment classification with machine learning models",
+        "time-series" => "Forecasting and trend analysis with statistical metrics",
+        "image" => "Image generation and color analysis processing",
+        "audio" => "Signal analysis with frequency detection and audio metrics",
+        _ => "Demo service for AI/ML testing"
+    };
+
+    private string GetDemoEmoji(string demoType) => demoType switch
+    {
+        "classification" => "???",
+        "time-series" => "??",
+        "image" => "???",
+        "audio" => "??",
+        _ => "??"
+    };
+
+    public class DemoResult
+    {
+        public string DemoType { get; set; }
+        public bool Success { get; set; }
+        public string Message { get; set; }
+        public object Data { get; set; }
+        public string ExecutionTimeMs { get; set; }
+    }
+}
