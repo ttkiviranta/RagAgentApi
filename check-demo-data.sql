@@ -65,7 +65,6 @@ SELECT
     'SUCCESS RATE %' as "Metric",
     ROUND((SUM(CASE WHEN "Success" THEN 1 ELSE 0 END)::numeric / COUNT(*) * 100), 1)::text as "Value"
 FROM "DemoExecutions"
-WHERE COUNT(*) > 0
 
 UNION ALL
 
