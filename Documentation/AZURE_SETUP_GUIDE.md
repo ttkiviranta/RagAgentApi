@@ -1,46 +1,46 @@
 # Azure Setup Guide - RAG Agent API
 
-Tämä dokumentaatio opastaa sinua Azure-palveluiden automatisoituun asentamiseen PowerShell-skriptillä.
+This guide will help you automate the setup of Azure services for the RAG Agent API using PowerShell scripts.
 
-## ?? Vaatimukset
+## ?? Prerequisites
 
-### Ennen kuin aloitat
-1. **Azure Subscription** - Aktiivinen Azure-tili
-2. **Azure CLI** - Asenna osoitteesta: https://learn.microsoft.com/en-us/cli/azure/install-azure-cli
-3. **PowerShell 7+** - Desktoppiversio tai PowerShell Core
-4. **Riittävät oikeudet** - Pystyä luomaan resursseja Azure-tilauksessa
+### Before You Start
+1. **Azure Subscription** - An active Azure account
+2. **Azure CLI** - Install from: https://learn.microsoft.com/en-us/cli/azure/install-azure-cli
+3. **PowerShell 7+** - Desktop version or PowerShell Core
+4. **Sufficient Permissions** - Ability to create resources in your Azure subscription
 
-### Tarkistus
+### Verification
 ```powershell
-# Tarkista Azure CLI
+# Verify Azure CLI
 az --version
 
-# Tarkista PowerShell
+# Verify PowerShell
 $PSVersionTable.PSVersion
 ```
 
 ---
 
-## ?? Pikaopas
+## ?? Quick Start
 
-### 1. Hanki tarvittavat tiedot
+### 1. Gather Required Information
 ```powershell
-# Listaa käytettävissä olevat abonnementit
+# List available subscriptions
 az account list --output table
 
-# Valitse haluamasi abonnementti
+# Set your desired subscription
 $SubscriptionId = "your-subscription-id-here"
 
-# Listaa saatavilla olevat sijainnit
+# List available locations
 az account list-locations --output table
 ```
 
-### 2. Suorita asennus
+### 2. Run the Setup
 ```powershell
-# Siirry projektihakemistoon
+# Navigate to project directory
 cd C:\Users\ttkiv\source\repos\RagAgentApi
 
-# Suorita asennus
+# Execute setup
 .\setup-azure-services.ps1 `
     -SubscriptionId "00000000-0000-0000-0000-000000000000" `
     -ResourceGroupName "rag-agent-rg" `
@@ -50,25 +50,25 @@ cd C:\Users\ttkiv\source\repos\RagAgentApi
 
 ---
 
-## ?? Skriptin Parametrit
+## ?? Script Parameters
 
-| Parametri | Tyyppi | Pakollinen | Kuvaus |
-|-----------|--------|-----------|--------|
-| `SubscriptionId` | string | ? | Azure-tilauksesi tunnus |
-| `ResourceGroupName` | string | ? | Uuden resurssiryhmän nimi |
-| `Location` | string | ? | Azure-alue (esim. westeurope, eastus) |
-| `EnvironmentName` | string | | Ympäristö-tunnus (dev, staging, prod) |
-| `SkipAISearch` | switch | | Ohita Azure AI Search -luonti |
-| `SkipBlobStorage` | switch | | Ohita Azure Blob Storage -luonti |
-| `SkipDocumentIntelligence` | switch | | Ohita Document Intelligence -luonti |
-| `SkipApplicationInsights` | switch | | Ohita Application Insights -luonti |
-| `DryRun` | switch | | Simuloi ilman oikeita muutoksia |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `SubscriptionId` | string | ? | Your Azure subscription ID |
+| `ResourceGroupName` | string | ? | Name of the new resource group |
+| `Location` | string | ? | Azure region (e.g., westeurope, eastus) |
+| `EnvironmentName` | string | | Environment identifier (dev, staging, prod) |
+| `SkipAISearch` | switch | | Skip Azure AI Search creation |
+| `SkipBlobStorage` | switch | | Skip Azure Blob Storage creation |
+| `SkipDocumentIntelligence` | switch | | Skip Document Intelligence creation |
+| `SkipApplicationInsights` | switch | | Skip Application Insights creation |
+| `DryRun` | switch | | Simulate without making actual changes |
 
 ---
 
-## ?? Käyttöesimerkit
+## ?? Usage Examples
 
-### Esimerkki 1: Perusasennus (vain Azure OpenAI)
+### Example 1: Basic Setup (Azure OpenAI Only)
 ```powershell
 .\setup-azure-services.ps1 `
     -SubscriptionId "00000000-0000-0000-0000-000000000000" `
@@ -76,7 +76,7 @@ cd C:\Users\ttkiv\source\repos\RagAgentApi
     -Location "westeurope"
 ```
 
-### Esimerkki 2: Kaikki palvelut (suositeltu tuotannolle)
+### Example 2: Complete Setup (Recommended for Production)
 ```powershell
 .\setup-azure-services.ps1 `
     -SubscriptionId "00000000-0000-0000-0000-000000000000" `
@@ -85,7 +85,7 @@ cd C:\Users\ttkiv\source\repos\RagAgentApi
     -EnvironmentName "prod"
 ```
 
-### Esimerkki 3: Testaus ilman muutoksia
+### Example 3: Test Without Making Changes
 ```powershell
 .\setup-azure-services.ps1 `
     -SubscriptionId "00000000-0000-0000-0000-000000000000" `
@@ -94,7 +94,7 @@ cd C:\Users\ttkiv\source\repos\RagAgentApi
     -DryRun
 ```
 
-### Esimerkki 4: Minimaaliset palvelut
+### Example 4: Minimal Setup
 ```powershell
 .\setup-azure-services.ps1 `
     -SubscriptionId "00000000-0000-0000-0000-000000000000" `
@@ -108,24 +108,24 @@ cd C:\Users\ttkiv\source\repos\RagAgentApi
 
 ---
 
-## ?? Palvelut ja niiden roolit
+## ?? Services and Their Roles
 
-### Pakollinen ?
-- **Azure OpenAI Service** - Text embeddings ja chat completions
+### Required ?
+- **Azure OpenAI Service** - Text embeddings and chat completions
 
-### Valinnainen (suositeltu)
-- **Azure AI Search** - Vektori- ja täyteksthaku (legacy)
-- **Azure Blob Storage** - Dokumenttien tallennus
-- **Application Insights** - Loki- ja telemetrian seuranta
+### Optional (Recommended)
+- **Azure AI Search** - Vector and full-text search (legacy)
+- **Azure Blob Storage** - Document storage
+- **Application Insights** - Logging and telemetry monitoring
 
-### Valinnainen
-- **Document Intelligence** - Dokumentin tunnistus ja jäsentäminen
+### Optional
+- **Document Intelligence** - Document recognition and parsing
 
 ---
 
-## ?? Skriptin tuloste
+## ?? Script Output
 
-Skripti luo tiedoston `azure-config-{environment}.env` sisältäen:
+The script generates a file `azure-config-{environment}.env` containing:
 ```
 AZURE_OPENAI_ENDPOINT=https://your-openai.openai.azure.com/
 AZURE_OPENAI_KEY=your-key-here
@@ -136,9 +136,9 @@ AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-35-turbo
 
 ---
 
-## ? Konfiguraation viimeistely
+## ? Configuration Finalization
 
-### 1. Kopioi arvot appsettings-tiedostoihin
+### 1. Copy Values to appsettings Files
 
 **appsettings.json**
 ```json
@@ -172,82 +172,82 @@ AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-35-turbo
 }
 ```
 
-### 2. Suojaa konfiguraatiotiedostot
+### 2. Secure Configuration Files
 ```powershell
-# Lisää .gitignore-tiedostoon
+# Add to .gitignore
 echo "azure-config-*.env" >> .gitignore
 echo "appsettings*.json" >> .gitignore
 
-# Älä koskaan commitoi konfiguraatiotiedostoja!
+# Never commit configuration files!
 ```
 
-### 3. Testaa yhteys
+### 3. Test Connection
 ```bash
 dotnet run
 ```
 
-Navigoi osoitteeseen `https://localhost:7000` ja tarkista Swagger UI.
+Navigate to `https://localhost:7000` and verify Swagger UI.
 
 ---
 
-## ?? Vianmääritys
+## ?? Troubleshooting
 
-### Skripti sanoo: "Azure CLI not installed"
+### Script says: "Azure CLI not installed"
 ```powershell
-# Asenna Azure CLI
+# Install Azure CLI
 # Windows: choco install azure-cli
 # Mac: brew install azure-cli
 # Linux: curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 ```
 
-### Skripti sanoo: "Not authenticated"
+### Script says: "Not authenticated"
 ```powershell
-# Kirjaudu Azure-palveluun
+# Login to Azure
 az login
 
-# Jos sinulla on useita tilaajia, valitse oikea
+# If you have multiple subscriptions, select the correct one
 az account set --subscription "your-subscription-id"
 ```
 
-### Deployment epäonnistuu
+### Deployment Fails
 ```powershell
-# Tarkista käytettävissä olevat SKU:t
+# Check available SKUs
 az cognitiveservices account list-kinds --location westeurope
 
-# Tarkista kiintiöt
+# Check quotas
 az cognitiveservices account list-usage --resource-group rag-agent-rg --name your-openai-name
 ```
 
-### Palvelua ei löydy Azure-portaalista
+### Service Not Found in Azure Portal
 ```powershell
-# Tarkista resurssiryhmä
+# Verify resource group
 az group list --output table
 
-# Listaa resurssit resurssiryhmässä
+# List resources in resource group
 az resource list --resource-group rag-agent-rg --output table
 ```
 
 ---
 
-## ?? Azure-portalissa tarkistaminen
+## ?? Verifying in Azure Portal
 
-1. Siirry osoitteeseen https://portal.azure.com
-2. Etsi resurssiryhmä: `rag-agent-rg` (tai nimesi)
-3. Tarkista luodut resurssit:
+1. Go to https://portal.azure.com
+2. Find your resource group: `rag-agent-rg` (or your custom name)
+3. Verify created resources:
    - Azure OpenAI Service
-   - Azure AI Search (jos ei ohitettu)
-   - Storage Account (jos ei ohitettu)
-   - Application Insights (jos ei ohitettu)
+   - Azure AI Search (if not skipped)
+   - Storage Account (if not skipped)
+   - Application Insights (if not skipped)
 
 ---
 
-## ?? Resurssin poistaminen (jos tarvitsee)
+## ?? Deleting Resources (if needed)
 
 ```powershell
-# Poista koko resurssiryhmä (VAROITUS: pysyvä)
+# Delete entire resource group (WARNING: permanent)
 az group delete --name rag-agent-rg --yes
 
-# Poista yksittäinen resurssi
+# Delete individual resource
 az resource delete `
     --resource-group rag-agent-rg `
     --name your-openai-name `
@@ -256,34 +256,34 @@ az resource delete `
 
 ---
 
-## ?? Parhaita käytäntöjä
+## ?? Best Practices
 
-? **Tehdä**
-- Käytä erilisiä resurssiryhmia dev/staging/prod-ympäristöille
-- Säilytä konfiguraatiotiedostot turvallisesti
-- Käytä DryRun-vaihtoehtoa ensin testaamisen varalle
-- Dokumentoi käytetyt skriptien parametrit
+? **Do**
+- Use separate resource groups for dev/staging/prod environments
+- Keep configuration files secure
+- Use DryRun option first for testing
+- Document script parameters used
 
-? **Ei saa tehdä**
-- Älä commitoi Azure-avaimia Githubiin
-- Älä jaa konfiguraatiotiedostoja turvattomasti
-- Älä käytä tuotannon avaimia kehityksessä
-- Älä poista resurssiryhmää vahingossa
-
----
-
-## ?? Lisäresurssit
-
-- [Azure OpenAI -dokumentaatio](https://learn.microsoft.com/en-us/azure/cognitive-services/openai/)
-- [Azure AI Search -dokumentaatio](https://learn.microsoft.com/en-us/azure/search/)
-- [Azure CLI -viite](https://learn.microsoft.com/en-us/cli/azure/)
-- [Azure PowerShell -dokumentaatio](https://learn.microsoft.com/en-us/powershell/azure/)
+? **Don't**
+- Commit Azure keys to GitHub
+- Share configuration files insecurely
+- Use production keys in development
+- Accidentally delete resource groups
 
 ---
 
-## ?? Apua tarvitset?
+## ?? Additional Resources
 
-Jos kohtaat ongelmia:
-1. Tarkista lokitiedostot: `$HOME\.azure\cmdline_*_log.txt`
-2. Käytä `-Verbose` -vaihtoehtoa lisätiedoille
-3. Katso [Azure-tuki](https://azure.microsoft.com/en-us/support/)
+- [Azure OpenAI Documentation](https://learn.microsoft.com/en-us/azure/cognitive-services/openai/)
+- [Azure AI Search Documentation](https://learn.microsoft.com/en-us/azure/search/)
+- [Azure CLI Reference](https://learn.microsoft.com/en-us/cli/azure/)
+- [Azure PowerShell Documentation](https://learn.microsoft.com/en-us/powershell/azure/)
+
+---
+
+## ?? Need Help?
+
+If you encounter issues:
+1. Check logs: `$HOME\.azure\cmdline_*_log.txt`
+2. Use `-Verbose` flag for additional output
+3. See [Azure Support](https://azure.microsoft.com/en-us/support/)
