@@ -248,6 +248,7 @@ The API includes **4 standalone demo services** for demonstrating AI/ML capabili
 - **Time-Series**: Forecasting and trend analysis with statistical metrics
 - **Image Processing**: Image generation and color analysis (256x256 PNG)
 - **Audio Processing**: Signal analysis with frequency detection (440Hz WAV)
+- **A2A Pipeline** (NEW): Real-time Agent-to-Agent communication visualization
 
 ### Demo Endpoints
 
@@ -322,6 +323,7 @@ Demo services now support **flexible, configurable data sourcing**:
 For detailed demo documentation, see:
 - [Documentation/DEMO_SERVICES.md](Documentation/DEMO_SERVICES.md) - Demo Services Overview
 - [Documentation/DEMO_REPOSITORY_PATTERN.md](Documentation/DEMO_REPOSITORY_PATTERN.md) - Repository Pattern Details
+- [Documentation/A2A_PIPELINE_DEMO.md](Documentation/A2A_PIPELINE_DEMO.md) - Agent-to-Agent Protocol Demo
 
 ---
 
@@ -343,10 +345,14 @@ For detailed demo documentation, see:
 - `POST /api/SpecializedAgentsTest/test-youtube` - Test YouTube agent
 - `POST /api/SpecializedAgentsTest/test-all` - Test all specialized agents
 
-#### Agent Management
-- `GET /api/AgentManagementTest/agent-types` - View all agent types
-- `POST /api/AgentManagementTest/test-selection` - Test agent selection
-- `POST /api/AgentManagementTest/test-batch-selection` - Batch URL testing
+#### Agent-to-Agent Communication (NEW)
+- `POST /api/demo/run?demoType=a2a-pipeline` - Run A2A pipeline demo
+- `GET /api/a2a/agents` - Get registered agents
+- `POST /api/a2a/send-message` - Send direct agent-to-agent message
+- `GET /api/a2a/conversations/{conversationId}/messages` - Get message history
+
+#### Web UI Demo
+- `https://localhost:7000/demos/a2a` - Interactive A2A Pipeline visualization
 
 #### Enhanced Orchestration
 - `POST /api/OrchestratorTest/test-enhanced-orchestration` - Test full enhanced pipeline
