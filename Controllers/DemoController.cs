@@ -13,7 +13,7 @@ public class DemoController : ControllerBase
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<DemoController> _logger;
 
-    private static readonly string[] AvailableDemos = { "classification", "time-series", "image", "audio" };
+    private static readonly string[] AvailableDemos = { "classification", "time-series", "image", "audio", "a2a-pipeline" };
 
     public DemoController(IServiceProvider serviceProvider, ILogger<DemoController> logger)
     {
@@ -165,6 +165,7 @@ public class DemoController : ControllerBase
             "time-series" => _serviceProvider.GetService<TimeSeriesDemoService>(),
             "image" => _serviceProvider.GetService<ImageProcessingDemoService>(),
             "audio" => _serviceProvider.GetService<AudioProcessingDemoService>(),
+            "a2a-pipeline" => _serviceProvider.GetService<A2ADemoService>(),
             _ => null
         };
     }

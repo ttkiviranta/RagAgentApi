@@ -1,0 +1,295 @@
+@page "/demos/a2a"
+@using RagAgentUI.Services
+@using System.Text.Json
+@inject HttpClient Http
+@inject ILogger<A2APipeline> Logger
+
+<div class="p-8 max-w-7xl mx-auto">
+    <h1 class="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Agent-to-Agent Pipeline Demo</h1>
+    <p class="text-gray-600 dark:text-gray-400 mb-8">
+        Visualize real-time communication between multiple AI agents in a RAG pipeline
+    </p>
+
+    @if (!IsLoaded)
+    {
+        <div class="flex items-center justify-center h-64">
+            <div class="text-gray-500">Loading A2A protocol...</div>
+        </div>
+    }
+    else
+    {
+        <!-- Control Panel -->
+        <div class="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button @onclick="RunA2APipeline"
+                    disabled="@IsRunning"
+                    class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium">
+                @if (IsRunning)
+                {
+                    <span>⏳ Running Pipeline...</span>
+                }
+                else
+                {
+                    <span>▶ Run A2A Pipeline</span>
+                }
+            </button>
+
+            <button @onclick="GetRegisteredAgents"
+                    disabled="@IsRunning"
+                    class="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium">
+                🤖 Load Agents
+            </button>
+
+            <button @onclick="ClearResults"
+                    disabled="@IsRunning"
+                    class="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium">
+                🗑️ Clear Results
+            </button>
+        </div>
+
+        <!-- Agents Section -->
+        @if (Agents.Any())
+        {
+            <div class="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Registered Agents</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    @foreach (var agent in Agents)
+                    {
+                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800 rounded-lg p-4 border border-blue-200 dark:border-blue-700">
+                            <h3 class="font-bold text-blue-900 dark:text-blue-100">@agent.Name</h3>
+                            <p class="text-sm text-blue-700 dark:text-blue-300 mt-1">@agent.Description</p>
+                            <div class="mt-2 flex items-center gap-2">
+                                <span class="inline-block bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">@agent.Type</span>
+                                <span class="text-xs text-blue-600 dark:text-blue-400">@agent.Capabilities.Count caps</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Pipeline Results -->
+        @if (PipelineResult != null)
+        {
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                    @if (PipelineResult.Success)
+                    {
+                        <span class="text-green-600 dark:text-green-400">✓ Pipeline Execution</span>
+                    }
+                    else
+                    {
+                        <span class="text-red-600 dark:text-red-400">✗ Pipeline Failed</span>
+                    }
+                </h2>
+
+                <!-- Summary Stats -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-blue-50 dark:bg-blue-900 p-4 rounded">
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">Total Steps</p>
+                        <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">@(GetSummaryData<int>("totalSteps"))</p>
+                    </div>
+                    <div class="bg-green-50 dark:bg-green-900 p-4 rounded">
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">Total Messages</p>
+                        <p class="text-2xl font-bold text-green-600 dark:text-green-400">@(GetSummaryData<int>("totalMessages"))</p>
+                    </div>
+                    <div class="bg-purple-50 dark:bg-purple-900 p-4 rounded">
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">Execution Time</p>
+                        <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">@(GetSummaryData<long>("totalExecutionTimeMs"))ms</p>
+                    </div>
+                    <div class="bg-orange-50 dark:bg-orange-900 p-4 rounded">
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">Avg Step Time</p>
+                        <p class="text-2xl font-bold text-orange-600 dark:text-orange-400">@(Math.Round(GetSummaryData<double>("averageStepTimeMs")))ms</p>
+                    </div>
+                </div>
+
+                <!-- Pipeline Flow Visualization -->
+                <div class="mb-6">
+                    <h3 class="font-semibold mb-4 text-gray-900 dark:text-white">Communication Flow</h3>
+                    <div class="space-y-2">
+                        @if (GetPipelineSteps() is var steps && steps.Any())
+                        {
+                            @foreach (var step in steps)
+                            {
+                                var stepData = step as JsonElement?;
+                                <div class="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                                    <div class="flex items-center gap-2 flex-1">
+                                        <span class="font-medium text-blue-600 dark:text-blue-400">@GetJsonProperty(stepData, "fromAgent")</span>
+                                        <span class="text-gray-400">→</span>
+                                        <span class="font-medium text-green-600 dark:text-green-400">@GetJsonProperty(stepData, "toAgent")</span>
+                                    </div>
+                                    <span class="text-xs bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded">@GetJsonProperty(stepData, "messageType")</span>
+                                    <span class="text-xs font-medium">@(GetJsonProperty(stepData, "executionTimeMs"))ms</span>
+                                    <span class="text-xs @(GetJsonProperty(stepData, "statusCode") == "200" ? "text-green-600" : "text-red-600")">
+                                        @(GetJsonProperty(stepData, "statusCode") == "200" ? "✓" : "✗")
+                                    </span>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <!-- Detailed Steps -->
+                <div>
+                    <h3 class="font-semibold mb-4 text-gray-900 dark:text-white">Detailed Steps</h3>
+                    @if (GetPipelineSteps() is var detailedSteps && detailedSteps.Any())
+                    {
+                        @foreach (var step in detailedSteps)
+                        {
+                            var stepNum = GetJsonProperty(step as JsonElement?, "stepNumber");
+                            <details class="mb-3 border border-gray-200 dark:border-gray-700 rounded">
+                                <summary class="p-3 cursor-pointer bg-gray-50 dark:bg-gray-700 font-medium">
+                                    Step @stepNum: @GetJsonProperty(step as JsonElement?, "fromAgent") → @GetJsonProperty(step as JsonElement?, "toAgent")
+                                </summary>
+                                <div class="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                                    <pre class="text-xs bg-gray-100 dark:bg-gray-900 p-3 rounded overflow-auto">@JsonSerializer.Serialize(step, new JsonSerializerOptions { WriteIndented = true })</pre>
+                                </div>
+                            </details>
+                        }
+                    }
+                </div>
+
+                <!-- Message History -->
+                <div class="mt-6">
+                    <h3 class="font-semibold mb-4 text-gray-900 dark:text-white">Conversation ID</h3>
+                    <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded font-mono text-sm break-all">
+                        @(GetSummaryData<string>("conversationId"))
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Error Message -->
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="mt-4 p-4 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded">
+                <p class="text-red-800 dark:text-red-200 font-medium">Error: @ErrorMessage</p>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool IsLoaded = false;
+    private bool IsRunning = false;
+    private List<A2AAgentInfo> Agents = new();
+    private DemoResultInfo? PipelineResult = null;
+    private string ErrorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            IsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Logger.LogError(ex, "Error loading A2A component");
+        }
+    }
+
+    private async Task RunA2APipeline()
+    {
+        IsRunning = true;
+        ErrorMessage = string.Empty;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/demo/run?demoType=a2a-pipeline", new { });
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                PipelineResult = JsonSerializer.Deserialize<DemoResultInfo>(json);
+            }
+            else
+            {
+                ErrorMessage = "Failed to run A2A pipeline";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Logger.LogError(ex, "Error running A2A pipeline");
+        }
+        finally
+        {
+            IsRunning = false;
+        }
+    }
+
+    private async Task GetRegisteredAgents()
+    {
+        try
+        {
+            var response = await Http.GetAsync("/api/a2a/agents");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                Agents = JsonSerializer.Deserialize<List<A2AAgentInfo>>(json) ?? new();
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Logger.LogError(ex, "Error loading agents");
+        }
+    }
+
+    private void ClearResults()
+    {
+        PipelineResult = null;
+        ErrorMessage = string.Empty;
+    }
+
+    private T GetSummaryData<T>(string key)
+    {
+        if (PipelineResult?.Data is JsonElement dataElement)
+        {
+            var summaryElement = dataElement.GetProperty("summary");
+            if (summaryElement.TryGetProperty(key, out var value))
+            {
+                return JsonSerializer.Deserialize<T>(value.GetRawText()) ?? default(T)!;
+            }
+        }
+        return default(T)!;
+    }
+
+    private List<object>? GetPipelineSteps()
+    {
+        if (PipelineResult?.Data is JsonElement dataElement)
+        {
+            if (dataElement.TryGetProperty("pipelineSteps", out var stepsElement))
+            {
+                return JsonSerializer.Deserialize<List<object>>(stepsElement.GetRawText());
+            }
+        }
+        return null;
+    }
+
+    private string GetJsonProperty(JsonElement? element, string key)
+    {
+        if (element?.TryGetProperty(key, out var value) == true)
+        {
+            return value.GetString() ?? value.ToString();
+        }
+        return string.Empty;
+    }
+
+    public class A2AAgentInfo
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public List<string> Capabilities { get; set; } = new();
+    }
+
+    public class DemoResultInfo
+    {
+        public string DemoType { get; set; } = string.Empty;
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public JsonElement? Data { get; set; }
+        public string ExecutionTimeMs { get; set; } = string.Empty;
+    }
+}

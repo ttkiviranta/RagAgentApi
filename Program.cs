@@ -1,6 +1,7 @@
 using RagAgentApi.Agents;
 using RagAgentApi.Services;
 using RagAgentApi.Services.DemoServices;
+using RagAgentApi.Services.A2A;
 using RagAgentApi.Filters;
 using RagAgentApi.Data;
 using RagAgentApi.Hubs;
@@ -110,6 +111,10 @@ builder.Services.AddScoped<ClassificationDemoService>();
 builder.Services.AddScoped<TimeSeriesDemoService>();
 builder.Services.AddScoped<ImageProcessingDemoService>();
 builder.Services.AddScoped<AudioProcessingDemoService>();
+builder.Services.AddScoped<A2ADemoService>();
+
+// A2A Protocol Services
+builder.Services.AddSingleton<IA2AProtocolService, A2AProtocolService>();
 
 // Demo Data Repository - Configurable data source
 var demoDataSource = builder.Configuration.GetValue<string>("DemoSettings:DataSource", "local").ToLower();
