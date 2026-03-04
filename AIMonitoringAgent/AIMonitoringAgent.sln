@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34407.89
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIMonitoringAgent.Shared", "AIMonitoringAgent.Shared\AIMonitoringAgent.Shared.csproj", "{11223344-5566-7788-99AA-BBCCDDEE0011}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIMonitoringAgent.Functions", "AIMonitoringAgent.Functions\AIMonitoringAgent.Functions.csproj", "{22334455-6677-8899-AABB-CCDDEEFF0022}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIMonitoringAgent.TeamsBot", "AIMonitoringAgent.TeamsBot\AIMonitoringAgent.TeamsBot.csproj", "{33445566-7788-99AA-BBCC-DDEE0011FF33}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{11223344-5566-7788-99AA-BBCCDDEE0011}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{11223344-5566-7788-99AA-BBCCDDEE0011}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{11223344-5566-7788-99AA-BBCCDDEE0011}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{11223344-5566-7788-99AA-BBCCDDEE0011}.Release|Any CPU.Build.0 = Release|Any CPU
+		{22334455-6677-8899-AABB-CCDDEEFF0022}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{22334455-6677-8899-AABB-CCDDEEFF0022}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{22334455-6677-8899-AABB-CCDDEEFF0022}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{22334455-6677-8899-AABB-CCDDEEFF0022}.Release|Any CPU.Build.0 = Release|Any CPU
+		{33445566-7788-99AA-BBCC-DDEE0011FF33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{33445566-7788-99AA-BBCC-DDEE0011FF33}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{33445566-7788-99AA-BBCC-DDEE0011FF33}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{33445566-7788-99AA-BBCC-DDEE0011FF33}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
