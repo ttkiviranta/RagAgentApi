@@ -91,31 +91,19 @@ public interface IEmailNotifier : INotifier
 public class EmailNotifier : IEmailNotifier
 {
     private readonly ILogger<EmailNotifier> _logger;
-    private readonly string? _smtpServer;
-    private readonly int _smtpPort;
-    private readonly string? _smtpUsername;
-    private readonly string? _smtpPassword;
-    private readonly string? _fromAddress;
+    private readonly IConfiguration _configuration;
 
     public EmailNotifier(
         ILogger<EmailNotifier> logger,
-        string? smtpServer = null,
-        int smtpPort = 587,
-        string? smtpUsername = null,
-        string? smtpPassword = null,
-        string? fromAddress = null)
+        IConfiguration configuration)
     {
         _logger = logger;
-        _smtpServer = smtpServer;
-        _smtpPort = smtpPort;
-        _smtpUsername = smtpUsername;
-        _smtpPassword = smtpPassword;
-        _fromAddress = fromAddress;
+        _configuration = configuration;
     }
 
     public async Task SendAsync(AnalysisResult analysis, AppInsightsException exception)
     {
-        _logger.LogWarning("Email notifier not fully implemented - SMTP credentials required");
+        _logger.LogWarning("Email notifier requires recipients list - use SendAsync(analysis, exception, recipients) instead");
         await Task.CompletedTask;
     }
 
@@ -123,22 +111,46 @@ public class EmailNotifier : IEmailNotifier
     {
         try
         {
-            if (string.IsNullOrEmpty(_smtpServer))
+            var smtpServer = _configuration.GetValue<string>("EmailSettings:SmtpServer");
+            var smtpPort = _configuration.GetValue<int>("EmailSettings:SmtpPort", 587);
+            var username = _configuration.GetValue<string>("EmailSettings:Username");
+            var password = _configuration.GetValue<string>("EmailSettings:Password");
+            var fromAddress = _configuration.GetValue<string>("EmailSettings:FromAddress");
+            var fromName = _configuration.GetValue<string>("EmailSettings:FromName", "RAG Agent");
+            var useTls = _configuration.GetValue<bool>("EmailSettings:UseTls", true);
+
+            if (string.IsNullOrEmpty(smtpServer) || string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
-                _logger.LogWarning("SMTP server not configured, skipping email notification");
+                _logger.LogWarning("Email settings not fully configured. Skipping email notification.");
                 return;
             }
 
-            var subject = $"[{analysis.Severity.ToUpper()}] {analysis.Category} Error: {exception.ExceptionType}";
-            var body = BuildEmailBody(analysis, exception);
+            using (var smtpClient = new System.Net.Mail.SmtpClient(smtpServer, smtpPort))
+            {
+                smtpClient.EnableSsl = useTls;
+                smtpClient.Credentials = new System.Net.NetworkCredential(username, password);
+                smtpClient.Timeout = 10000;
 
-            // TODO: Implement actual SMTP sending using System.Net.Mail
-            _logger.LogInformation(
-                "Email notification would be sent to {RecipientCount} recipients: {Subject}",
-                recipients.Count,
-                subject);
+                var mailMessage = new System.Net.Mail.MailMessage
+                {
+                    From = new System.Net.Mail.MailAddress(fromAddress, fromName),
+                    Subject = $"[{analysis.Severity.ToUpper()}] {analysis.Category}: {exception.ExceptionType}",
+                    Body = BuildEmailBody(analysis, exception),
+                    IsBodyHtml = false
+                };
 
-            await Task.CompletedTask;
+                foreach (var recipient in recipients)
+                {
+                    mailMessage.To.Add(recipient);
+                }
+
+                await smtpClient.SendMailAsync(mailMessage);
+
+                _logger.LogInformation(
+                    "Error notification email sent to {Recipients} with subject: {Subject}",
+                    string.Join(", ", recipients),
+                    mailMessage.Subject);
+            }
         }
         catch (Exception ex)
         {
@@ -150,8 +162,8 @@ public class EmailNotifier : IEmailNotifier
     private static string BuildEmailBody(AnalysisResult analysis, AppInsightsException exception)
     {
         return $@"
-Error Analysis Report
-====================
+RAG Agent Error Notification
+============================
 
 Error ID: {analysis.ErrorId}
 Severity: {analysis.Severity}
@@ -177,6 +189,8 @@ Affected Operations
 -------------------
 {string.Join("\n", analysis.AffectedOperations.Select(o => $"- {o}"))}
 
+Additional Info
+---------------
 Is Recurring: {analysis.IsRecurring}
 Similar Errors: {analysis.SimilarErrorCount}
 Affected Users: {analysis.AffectedUsers}

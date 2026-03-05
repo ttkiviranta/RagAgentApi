@@ -5,6 +5,7 @@ using RagAgentApi.Services.A2A;
 using RagAgentApi.Filters;
 using RagAgentApi.Data;
 using RagAgentApi.Hubs;
+using AIMonitoringAgent.Shared.Services;
 using System.Reflection;
 using Microsoft.OpenApi.Models;
 using Microsoft.EntityFrameworkCore;
@@ -126,6 +127,9 @@ else
 {
     builder.Services.AddScoped<ITestDataRepository, LocalFileRepository>();
 }
+
+// Email Notifier - Scoped for sending notifications
+builder.Services.AddScoped<IEmailNotifier, EmailNotifier>();
 
 // Orchestration - Singleton for thread state management
 builder.Services.AddSingleton<AgentOrchestrationService>();
