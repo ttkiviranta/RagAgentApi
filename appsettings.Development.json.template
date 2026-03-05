@@ -61,5 +61,39 @@
     "PostgresConnectionString": "Host=localhost;Port=5432;Database=ragagentdb;Username=postgres;Password=REPLACE_WITH_YOUR_POSTGRES_PASSWORD",
     "SaveResults": true,
     "ResultRetentionDays": 30
+  },
+
+  "NotificationConfigs": [
+    {
+      "Id": "email-ops",
+      "Channel": "email",
+      "Enabled": false,
+      "Recipients": ["operations@yourdomain.com"],
+      "Description": "Send critical errors to operations email"
+    },
+    {
+      "Id": "teams-dev",
+      "Channel": "teams",
+      "Enabled": false,
+      "WebhookUrl": "REPLACE_WITH_YOUR_TEAMS_WEBHOOK_URL",
+      "Description": "Send alerts to Teams development channel"
+    },
+    {
+      "Id": "slack-alerts",
+      "Channel": "slack",
+      "Enabled": false,
+      "WebhookUrl": "REPLACE_WITH_YOUR_SLACK_WEBHOOK_URL",
+      "Description": "Send alerts to Slack channel"
+    }
+  ],
+
+  "EmailSettings": {
+    "SmtpServer": "smtp.gmail.com",
+    "SmtpPort": 587,
+    "UseTls": true,
+    "FromAddress": "alerts@yourdomain.com",
+    "FromName": "RAG Agent Alerts",
+    "Username": "REPLACE_WITH_YOUR_EMAIL",
+    "Password": "REPLACE_WITH_YOUR_APP_PASSWORD"
   }
 }

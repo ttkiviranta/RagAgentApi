@@ -47,10 +47,38 @@
     "DefaultChunkOverlap": 200,
     "MinChunkSize": 100,
     "MaxChunkSize": 5000,
-    "DefaultTopK": 5,
-    "MaxTopK": 50,
-    "BatchSize": 100,
-    "VectorDimensions": 1536,
-    "MinimumSearchScore": 0.5
-  }
-}
+         "DefaultTopK": 5,
+         "MaxTopK": 50,
+         "BatchSize": 100,
+         "VectorDimensions": 1536,
+         "MinimumSearchScore": 0.5
+       },
+
+      "NotificationConfigs": [
+        {
+          "Channel": "email",
+          "Enabled": false,
+          "Recipients": ["operations@yourdomain.com"]
+        },
+        {
+          "Channel": "teams",
+          "Enabled": false,
+          "WebhookUrl": "YOUR_TEAMS_WEBHOOK_URL"
+        },
+        {
+          "Channel": "slack",
+          "Enabled": false,
+          "WebhookUrl": "YOUR_SLACK_WEBHOOK_URL"
+        }
+      ],
+
+      "EmailSettings": {
+        "SmtpServer": "smtp.gmail.com",
+        "SmtpPort": 587,
+        "UseTls": true,
+        "FromAddress": "alerts@yourdomain.com",
+        "FromName": "RAG Agent Alerts",
+        "Username": "your-email@gmail.com",
+        "Password": "your-app-password"
+      }
+    }
