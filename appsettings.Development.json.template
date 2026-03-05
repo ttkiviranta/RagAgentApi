@@ -1,40 +1,65 @@
 {
   "Logging": {
     "LogLevel": {
-   "Default": "Debug",
+      "Default": "Debug",
       "System": "Information",
- "Microsoft": "Information",
-    "Microsoft.AspNetCore": "Warning",
+      "Microsoft": "Information",
+      "Microsoft.AspNetCore": "Warning",
       "RagAgentApi.Agents": "Trace"
     }
   },
-  
+
   "ApplicationInsights": {
-    "ConnectionString": "YOUR_APPLICATION_INSIGHTS_CONNECTION_STRING_DEV"
+    "ConnectionString": "REPLACE_WITH_YOUR_APPLICATION_INSIGHTS_CONNECTION_STRING"
   },
-  
+
   "Azure": {
     "OpenAI": {
-      "Endpoint": "YOUR_AZURE_OPENAI_ENDPOINT_DEV",
-      "Key": "YOUR_AZURE_OPENAI_KEY_DEV",
-   "EmbeddingDeployment": "text-embedding-ada-002",
+      "Endpoint": "https://YOUR_RESOURCE_NAME.openai.azure.com/",
+      "Key": "REPLACE_WITH_YOUR_AZURE_OPENAI_KEY",
+      "EmbeddingDeployment": "text-embedding-ada-002",
       "ChatDeployment": "gpt-35-turbo",
       "ApiVersion": "2024-02-15-preview",
       "MaxTokens": 8192,
       "Temperature": 0.7
     },
     "Search": {
-      "Endpoint": "YOUR_AZURE_SEARCH_ENDPOINT_DEV",
-   "Key": "YOUR_AZURE_SEARCH_KEY_DEV",
+      "Endpoint": "https://YOUR_SEARCH_SERVICE.search.windows.net",
+      "Key": "REPLACE_WITH_YOUR_AZURE_SEARCH_KEY",
       "IndexName": "rag-agent-documents"
     },
     "Storage": {
-      "ConnectionString": "YOUR_AZURE_STORAGE_CONNECTION_STRING_DEV",
-   "ContainerName": "rag-documents"
-  },
+      "ConnectionString": "DefaultEndpointsProtocol=https;AccountName=YOUR_STORAGE_ACCOUNT;AccountKey=REPLACE_WITH_YOUR_STORAGE_KEY;EndpointSuffix=core.windows.net",
+      "ContainerName": "rag-documents"
+    },
     "DocumentIntelligence": {
-      "Endpoint": "YOUR_AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT_DEV",
-      "Key": "YOUR_AZURE_DOCUMENT_INTELLIGENCE_KEY_DEV"
-  }
+      "Endpoint": "https://YOUR_DOCUMENT_INTELLIGENCE_RESOURCE.cognitiveservices.azure.com/",
+      "Key": "REPLACE_WITH_YOUR_DOCUMENT_INTELLIGENCE_KEY"
+    }
+  },
+
+  "ConnectionStrings": {
+    "PostgreSQL": "Host=localhost;Port=5432;Database=ragagentdb;Username=postgres;Password=REPLACE_WITH_YOUR_POSTGRES_PASSWORD"
+  },
+
+  "RagSettings": {
+    "Mode": "hybrid",
+    "DefaultChunkSize": 1000,
+    "DefaultChunkOverlap": 200,
+    "MinChunkSize": 100,
+    "MaxChunkSize": 5000,
+    "DefaultTopK": 5,
+    "MaxTopK": 50,
+    "BatchSize": 100,
+    "VectorDimensions": 1536,
+    "MinimumSearchScore": 0.5
+  },
+
+  "DemoSettings": {
+    "DataSource": "local",
+    "LocalDataPath": "demos/",
+    "PostgresConnectionString": "Host=localhost;Port=5432;Database=ragagentdb;Username=postgres;Password=REPLACE_WITH_YOUR_POSTGRES_PASSWORD",
+    "SaveResults": true,
+    "ResultRetentionDays": 30
   }
 }
