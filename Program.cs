@@ -292,12 +292,32 @@ public class ContextCleanupService : BackgroundService
                     _logger.LogInformation("Cleaned up {Count} old agent contexts", cleanedCount);
                 }
 
-                await Task.Delay(_cleanupInterval, stoppingToken);
+                try
+                {
+                    await Task.Delay(_cleanupInterval, stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Normal shutdown - no action needed
+                    break;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutdown requested
+                break;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during context cleanup");
-                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken); // Retry after 5 minutes
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
         }
     }
