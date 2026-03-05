@@ -103,7 +103,7 @@ public class TeamsBotService : ITeamsBotService
 
         reply.Text = responseText;
 
-        return reply;
+        return (Activity)(object)reply;
     }
 
     private Activity HandleConversationUpdate(Activity activity)

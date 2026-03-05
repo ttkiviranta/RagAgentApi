@@ -29,7 +29,8 @@ public class EmbeddingService : IEmbeddingService
     {
         try
         {
-            var response = await _openAiClient.GetEmbeddingsAsync(_deploymentName, new EmbeddingsOptions { Input = { text } });
+            var options = new EmbeddingsOptions(_deploymentName, new[] { text });
+            var response = await _openAiClient.GetEmbeddingsAsync(options);
 
             var embedding = response.Value.Data[0].Embedding;
             _logger.LogDebug("Generated embedding for text of length {Length}", text.Length);
@@ -55,13 +56,9 @@ public class EmbeddingService : IEmbeddingService
             {
                 var batch = texts.Skip(i).Take(batchSize).ToList();
 
-                var embeddingsOptions = new EmbeddingsOptions();
-                foreach (var text in batch)
-                {
-                    embeddingsOptions.Input.Add(text);
-                }
+                var embeddingsOptions = new EmbeddingsOptions(_deploymentName, batch);
 
-                var response = await _openAiClient.GetEmbeddingsAsync(_deploymentName, embeddingsOptions);
+                var response = await _openAiClient.GetEmbeddingsAsync(embeddingsOptions);
 
                 foreach (var item in response.Value.Data)
                 {

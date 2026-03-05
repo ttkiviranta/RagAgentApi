@@ -36,15 +36,20 @@ msbuild.wrn
 *.userosscache
 *.sln.docstates
 
-# Configuration files with secrets
+# Configuration files with secrets - NEVER commit these!
 appsettings.Development.json
 appsettings.Production.json
 appsettings.Local.json
-**/appsettings.*.json
+appsettings.json
+RagAgentUI/appsettings.Development.json
+RagAgentUI/appsettings.Production.json
+RagAgentUI/appsettings.json
 
-# Keep only template files
+# Keep only template files for reference
 !appsettings.json.template
 !appsettings.Development.json.template
+!RagAgentUI/appsettings.json.template
+!RagAgentUI/appsettings.Development.json.template
 
 # Environment files
 .env

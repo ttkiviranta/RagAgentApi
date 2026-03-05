@@ -21,7 +21,7 @@ public class TeamsBotActivityHandler : ActivityHandler
     {
         _logger.LogInformation("Message received: {Text}", turnContext.Activity.Text);
 
-        var reply = await _botService.HandleActivityAsync(turnContext.Activity);
+        var reply = await _botService.HandleActivityAsync((Activity)(object)turnContext.Activity);
 
         if (reply is IMessageActivity messageReply)
         {
@@ -41,29 +41,13 @@ public class TeamsBotActivityHandler : ActivityHandler
             {
                 if (member.Id != turnContext.Activity.Recipient.Id)
                 {
-                    var reply = await _botService.HandleActivityAsync(turnContext.Activity);
+                    var reply = await _botService.HandleActivityAsync((Activity)(object)turnContext.Activity);
 
                     if (reply is IMessageActivity messageReply)
                     {
                         await turnContext.SendActivityAsync(reply, cancellationToken);
                     }
                 }
-            }
-        }
-    }
-
-    protected override async Task OnMembersAddedAsync(
-        List<ChannelAccount> membersAdded,
-        ITurnContext<IConversationUpdateActivity> turnContext,
-        CancellationToken cancellationToken)
-    {
-        foreach (var member in membersAdded)
-        {
-            if (member.Id != turnContext.Activity.Recipient.Id)
-            {
-                await turnContext.SendActivityAsync(
-                    "Welcome to the AI Monitoring Agent! I can help you analyze and track application errors.",
-                    cancellationToken: cancellationToken);
             }
         }
     }

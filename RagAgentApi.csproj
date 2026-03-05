@@ -34,6 +34,10 @@
     <PackageReference Include="Pgvector.EntityFrameworkCore" Version="0.2.2" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Bot.Builder" Version="4.22.0" />
+    <PackageReference Include="Microsoft.Bot.Schema" Version="4.22.0" />
+    <PackageReference Include="AdaptiveCards.Templating" Version="1.5.1" />
+    <PackageReference Include="RestSharp" Version="107.3.0" />
   </ItemGroup>
 
 </Project>

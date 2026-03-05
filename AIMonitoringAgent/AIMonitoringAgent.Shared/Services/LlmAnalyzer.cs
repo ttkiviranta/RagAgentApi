@@ -46,15 +46,16 @@ Be concise but thorough in your analysis.";
             var options = new ChatCompletionsOptions
             {
                 Temperature = 0.3f,
-                MaxTokens = 2000
+                MaxTokens = 2000,
+                DeploymentName = _deploymentName,
+                Messages = 
+                {
+                    new ChatRequestSystemMessage(systemPrompt),
+                    new ChatRequestUserMessage(userPrompt)
+                }
             };
 
-            options.Messages.Add(new ChatCompletionMessage(ChatRole.System, systemPrompt));
-            options.Messages.Add(new ChatCompletionMessage(ChatRole.User, userPrompt));
-
-            var response = await _openAiClient.GetChatCompletionsAsync(
-                _deploymentName,
-                options);
+            var response = await _openAiClient.GetChatCompletionsAsync(options);
 
             var content = response.Value.Choices[0].Message.Content;
             var result = ParseAnalysisResult(content, exception);
