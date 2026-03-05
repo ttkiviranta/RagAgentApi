@@ -1,5 +1,9 @@
 using AIMonitoringAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using MimeKit;
 
 namespace AIMonitoringAgent.Shared.Services;
 
@@ -113,11 +117,10 @@ public class EmailNotifier : IEmailNotifier
         {
             var smtpServer = _configuration.GetValue<string>("EmailSettings:SmtpServer");
             var smtpPort = _configuration.GetValue<int>("EmailSettings:SmtpPort", 587);
-            var username = _configuration.GetValue<string>("EmailSettings:Username");
-            var password = _configuration.GetValue<string>("EmailSettings:Password");
+            var username = _configuration.GetValue<string>("EmailSettings:Username")?.Trim();
+            var password = _configuration.GetValue<string>("EmailSettings:Password")?.Trim();
             var fromAddress = _configuration.GetValue<string>("EmailSettings:FromAddress");
             var fromName = _configuration.GetValue<string>("EmailSettings:FromName", "RAG Agent");
-            var useTls = _configuration.GetValue<bool>("EmailSettings:UseTls", true);
 
             if (string.IsNullOrEmpty(smtpServer) || string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
@@ -125,31 +128,53 @@ public class EmailNotifier : IEmailNotifier
                 return;
             }
 
-            using (var smtpClient = new System.Net.Mail.SmtpClient(smtpServer, smtpPort))
+            // Use MailKit for proper STARTTLS support on port 587
+            using (var client = new MailKit.Net.Smtp.SmtpClient())
             {
-                smtpClient.EnableSsl = useTls;
-                smtpClient.Credentials = new System.Net.NetworkCredential(username, password);
-                smtpClient.Timeout = 10000;
-
-                var mailMessage = new System.Net.Mail.MailMessage
+                try
                 {
-                    From = new System.Net.Mail.MailAddress(fromAddress, fromName),
-                    Subject = $"[{analysis.Severity.ToUpper()}] {analysis.Category}: {exception.ExceptionType}",
-                    Body = BuildEmailBody(analysis, exception),
-                    IsBodyHtml = false
-                };
+                    // Connect to SMTP server
+                    // Port 587 = SMTP + STARTTLS (not SSL)
+                    // Port 465 = SMTPS (SSL from the start)
+                    await client.ConnectAsync(smtpServer, smtpPort, MailKit.Security.SecureSocketOptions.StartTls);
 
-                foreach (var recipient in recipients)
-                {
-                    mailMessage.To.Add(recipient);
+                    _logger.LogDebug("Connected to SMTP server: {Server}:{Port}", smtpServer, smtpPort);
+
+                    // Authenticate with credentials
+                    await client.AuthenticateAsync(username, password);
+
+                    _logger.LogDebug("Authenticated as {Username}", username);
+
+                    // Build email message
+                    var emailMessage = new MimeKit.MimeMessage();
+                    emailMessage.From.Add(new MimeKit.MailboxAddress(fromName, fromAddress));
+                    emailMessage.Subject = $"[{analysis.Severity.ToUpper()}] {analysis.Category}: {exception.ExceptionType}";
+
+                    // Add recipients
+                    foreach (var recipient in recipients)
+                    {
+                        emailMessage.To.Add(new MimeKit.MailboxAddress("", recipient));
+                    }
+
+                    // Set body
+                    emailMessage.Body = new MimeKit.TextPart("plain")
+                    {
+                        Text = BuildEmailBody(analysis, exception)
+                    };
+
+                    // Send email
+                    await client.SendAsync(emailMessage);
+
+                    _logger.LogInformation(
+                        "Error notification email sent to {Recipients} with subject: {Subject}",
+                        string.Join(", ", recipients),
+                        emailMessage.Subject);
                 }
-
-                await smtpClient.SendMailAsync(mailMessage);
-
-                _logger.LogInformation(
-                    "Error notification email sent to {Recipients} with subject: {Subject}",
-                    string.Join(", ", recipients),
-                    mailMessage.Subject);
+                finally
+                {
+                    // Gracefully disconnect
+                    await client.DisconnectAsync(true);
+                }
             }
         }
         catch (Exception ex)
