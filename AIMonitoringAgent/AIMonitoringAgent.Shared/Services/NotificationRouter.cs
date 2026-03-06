@@ -1,9 +1,8 @@
 using AIMonitoringAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
-using MailKit.Net.Smtp;
-using MailKit.Security;
-using MimeKit;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 
 namespace AIMonitoringAgent.Shared.Services;
 
@@ -115,71 +114,68 @@ public class EmailNotifier : IEmailNotifier
     {
         try
         {
-            var smtpServer = _configuration.GetValue<string>("EmailSettings:SmtpServer");
-            var smtpPort = _configuration.GetValue<int>("EmailSettings:SmtpPort", 587);
-            var username = _configuration.GetValue<string>("EmailSettings:Username")?.Trim();
-            var password = _configuration.GetValue<string>("EmailSettings:Password")?.Trim();
+            var apiKey = _configuration.GetValue<string>("EmailSettings:SendGridApiKey")?.Trim();
             var fromAddress = _configuration.GetValue<string>("EmailSettings:FromAddress");
             var fromName = _configuration.GetValue<string>("EmailSettings:FromName", "RAG Agent");
 
-            if (string.IsNullOrEmpty(smtpServer) || string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+            if (string.IsNullOrEmpty(apiKey))
             {
-                _logger.LogWarning("Email settings not fully configured. Skipping email notification.");
+                _logger.LogWarning("SendGrid API key not configured. Skipping email notification.");
                 return;
             }
 
-            // Use MailKit for proper STARTTLS support on port 587
-            using (var client = new MailKit.Net.Smtp.SmtpClient())
+            if (string.IsNullOrEmpty(fromAddress) || recipients == null || recipients.Count == 0)
             {
-                try
-                {
-                    // Connect to SMTP server
-                    // Port 587 = SMTP + STARTTLS (not SSL)
-                    // Port 465 = SMTPS (SSL from the start)
-                    await client.ConnectAsync(smtpServer, smtpPort, MailKit.Security.SecureSocketOptions.StartTls);
+                _logger.LogWarning("From address or recipients not configured. Skipping email notification.");
+                return;
+            }
 
-                    _logger.LogDebug("Connected to SMTP server: {Server}:{Port}", smtpServer, smtpPort);
+            // Initialize SendGrid client
+            var client = new SendGridClient(apiKey);
 
-                    // Authenticate with credentials
-                    await client.AuthenticateAsync(username, password);
+            // Build email message
+            var from = new EmailAddress(fromAddress, fromName);
+            var subject = $"[{analysis.Severity.ToUpper()}] {analysis.Category}: {exception.ExceptionType}";
+            var body = BuildEmailBody(analysis, exception);
 
-                    _logger.LogDebug("Authenticated as {Username}", username);
+            // Add recipients
+            var tos = recipients.Select(r => new EmailAddress(r)).ToList();
 
-                    // Build email message
-                    var emailMessage = new MimeKit.MimeMessage();
-                    emailMessage.From.Add(new MimeKit.MailboxAddress(fromName, fromAddress));
-                    emailMessage.Subject = $"[{analysis.Severity.ToUpper()}] {analysis.Category}: {exception.ExceptionType}";
+            var msg = new SendGridMessage()
+            {
+                From = from,
+                Subject = subject,
+                PlainTextContent = body
+            };
 
-                    // Add recipients
-                    foreach (var recipient in recipients)
-                    {
-                        emailMessage.To.Add(new MimeKit.MailboxAddress("", recipient));
-                    }
+            foreach (var to in tos)
+            {
+                msg.AddTo(to);
+            }
 
-                    // Set body
-                    emailMessage.Body = new MimeKit.TextPart("plain")
-                    {
-                        Text = BuildEmailBody(analysis, exception)
-                    };
+            // Send email via SendGrid API
+            var response = await client.SendEmailAsync(msg);
 
-                    // Send email
-                    await client.SendAsync(emailMessage);
-
-                    _logger.LogInformation(
-                        "Error notification email sent to {Recipients} with subject: {Subject}",
-                        string.Join(", ", recipients),
-                        emailMessage.Subject);
-                }
-                finally
-                {
-                    // Gracefully disconnect
-                    await client.DisconnectAsync(true);
-                }
+            if (response.StatusCode == System.Net.HttpStatusCode.Accepted || 
+                response.StatusCode == System.Net.HttpStatusCode.OK)
+            {
+                _logger.LogInformation(
+                    "Error notification email sent via SendGrid to {Recipients} with subject: {Subject}",
+                    string.Join(", ", recipients),
+                    subject);
+            }
+            else
+            {
+                _logger.LogError(
+                    "SendGrid returned unexpected status {StatusCode} when sending to {Recipients}",
+                    response.StatusCode,
+                    string.Join(", ", recipients));
+                throw new Exception($"SendGrid error: {response.StatusCode}");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send email notification");
+            _logger.LogError(ex, "Failed to send email notification via SendGrid");
             throw;
         }
     }

@@ -88,12 +88,9 @@
   ],
 
   "EmailSettings": {
-    "SmtpServer": "smtp.gmail.com",
-    "SmtpPort": 587,
-    "UseTls": true,
+    "Provider": "SendGrid",
+    "SendGridApiKey": "REPLACE_WITH_YOUR_SENDGRID_API_KEY",
     "FromAddress": "alerts@yourdomain.com",
-    "FromName": "RAG Agent Alerts",
-    "Username": "REPLACE_WITH_YOUR_EMAIL",
-    "Password": "REPLACE_WITH_YOUR_APP_PASSWORD"
+    "FromName": "RAG Agent Alerts"
   }
 }
