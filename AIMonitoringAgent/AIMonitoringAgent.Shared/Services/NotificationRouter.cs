@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using SendGrid;
 using SendGrid.Helpers.Mail;
+using Azure.Communication.Email;
 
 namespace AIMonitoringAgent.Shared.Services;
 
@@ -114,15 +115,9 @@ public class EmailNotifier : IEmailNotifier
     {
         try
         {
-            var apiKey = _configuration.GetValue<string>("EmailSettings:SendGridApiKey")?.Trim();
+            var provider = _configuration.GetValue<string>("EmailSettings:Provider", "SendGrid");
             var fromAddress = _configuration.GetValue<string>("EmailSettings:FromAddress");
             var fromName = _configuration.GetValue<string>("EmailSettings:FromName", "RAG Agent");
-
-            if (string.IsNullOrEmpty(apiKey))
-            {
-                _logger.LogWarning("SendGrid API key not configured. Skipping email notification.");
-                return;
-            }
 
             if (string.IsNullOrEmpty(fromAddress) || recipients == null || recipients.Count == 0)
             {
@@ -130,16 +125,81 @@ public class EmailNotifier : IEmailNotifier
                 return;
             }
 
-            // Initialize SendGrid client
-            var client = new SendGridClient(apiKey);
-
-            // Build email message
-            var from = new EmailAddress(fromAddress, fromName);
             var subject = $"[{analysis.Severity.ToUpper()}] {analysis.Category}: {exception.ExceptionType}";
             var body = BuildEmailBody(analysis, exception);
 
-            // Add recipients
-            var tos = recipients.Select(r => new EmailAddress(r)).ToList();
+            if (provider.Equals("AzureCommunicationServices", StringComparison.OrdinalIgnoreCase))
+            {
+                await SendViaAzureAsync(subject, body, fromAddress, fromName, recipients);
+            }
+            else if (provider.Equals("SendGrid", StringComparison.OrdinalIgnoreCase))
+            {
+                await SendViaSendGridAsync(subject, body, fromAddress, fromName, recipients);
+            }
+            else
+            {
+                _logger.LogWarning("Unknown email provider: {Provider}", provider);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send email notification");
+            throw;
+        }
+    }
+
+    private async Task SendViaAzureAsync(string subject, string body, string fromAddress, string fromName, List<string> recipients)
+    {
+        try
+        {
+            var connectionString = _configuration.GetValue<string>("EmailSettings:AzureCommunicationServicesConnectionString")?.Trim();
+
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                _logger.LogWarning("Azure Communication Services connection string not configured. Skipping email notification.");
+                return;
+            }
+
+            var client = new EmailClient(connectionString);
+
+            var emailMessage = new EmailMessage(
+                senderAddress: fromAddress,
+                content: new EmailContent(subject)
+                {
+                    PlainText = body
+                },
+                recipients: new EmailRecipients(recipients.Select(r => new Azure.Communication.Email.EmailAddress(r)).ToList())
+            );
+
+            var response = await client.SendAsync(Azure.WaitUntil.Completed, emailMessage);
+
+            _logger.LogInformation(
+                "Error notification email sent via Azure Communication Services to {Recipients} with subject: {Subject}",
+                string.Join(", ", recipients),
+                subject);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send email notification via Azure Communication Services");
+            throw;
+        }
+    }
+
+    private async Task SendViaSendGridAsync(string subject, string body, string fromAddress, string fromName, List<string> recipients)
+    {
+        try
+        {
+            var apiKey = _configuration.GetValue<string>("EmailSettings:SendGridApiKey")?.Trim();
+
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                _logger.LogWarning("SendGrid API key not configured. Skipping email notification.");
+                return;
+            }
+
+            var client = new SendGridClient(apiKey);
+            var from = new SendGrid.Helpers.Mail.EmailAddress(fromAddress, fromName);
+            var tos = recipients.Select(r => new SendGrid.Helpers.Mail.EmailAddress(r)).ToList();
 
             var msg = new SendGridMessage()
             {
@@ -153,7 +213,6 @@ public class EmailNotifier : IEmailNotifier
                 msg.AddTo(to);
             }
 
-            // Send email via SendGrid API
             var response = await client.SendEmailAsync(msg);
 
             if (response.StatusCode == System.Net.HttpStatusCode.Accepted || 

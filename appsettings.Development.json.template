@@ -88,7 +88,8 @@
   ],
 
   "EmailSettings": {
-    "Provider": "SendGrid",
+    "Provider": "AzureCommunicationServices",
+    "AzureCommunicationServicesConnectionString": "REPLACE_WITH_YOUR_AZURE_COMMUNICATION_SERVICES_CONNECTION_STRING",
     "SendGridApiKey": "REPLACE_WITH_YOUR_SENDGRID_API_KEY",
     "FromAddress": "alerts@yourdomain.com",
     "FromName": "RAG Agent Alerts"
