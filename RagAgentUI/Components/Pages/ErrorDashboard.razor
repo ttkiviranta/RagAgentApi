@@ -1,0 +1,305 @@
+@page "/error-dashboard"
+@using RagAgentUI.Services
+@inject RagApiClient ApiClient
+@inject ILogger<ErrorDashboard> Logger
+
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                🚨 Error Dashboard
+            </h1>
+            <p class="text-gray-600 dark:text-gray-400">
+                Monitor and analyze application errors
+            </p>
+        </div>
+
+        <!-- Controls -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Severity Filter -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Severity Level
+                    </label>
+                    <select @onchange="OnSeverityChanged" 
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="">All Levels</option>
+                        <option value="INFO">Info</option>
+                        <option value="WARNING">Warning</option>
+                        <option value="ERROR">Error</option>
+                        <option value="CRITICAL">Critical</option>
+                    </select>
+                </div>
+
+                <!-- Pagination -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Items per Page
+                    </label>
+                    <select @onchange="OnLimitChanged" 
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="10">10</option>
+                        <option value="25" selected>25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+
+                <!-- Refresh Button -->
+                <div class="flex items-end">
+                    <button @onclick="OnRefreshClicked" 
+                            class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        @if (loading)
+        {
+            <div class="text-center py-12">
+                <div class="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <p class="text-gray-500 dark:text-gray-400 mt-4">Loading errors...</p>
+            </div>
+        }
+        <!-- No Errors -->
+        else if (errors == null || errors.Count == 0)
+        {
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-12 text-center">
+                <p class="text-gray-500 dark:text-gray-400 text-lg">
+                    ✅ No errors found. Your application is running smoothly!
+                </p>
+            </div>
+        }
+        <!-- Errors List -->
+        else
+        {
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+                <!-- Table Header -->
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Error ID</th>
+                                <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Type</th>
+                                <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Severity</th>
+                                <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Message</th>
+                                <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Timestamp</th>
+                                <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Notified</th>
+                                <th class="px-6 py-3 text-center text-sm font-semibold text-gray-900 dark:text-white">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (errors != null && errors.Count > 0)
+                            {
+                                @foreach (var error in errors)
+                                {
+                                    <tr class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                                        <td class="px-6 py-4 text-sm font-mono text-blue-600 dark:text-blue-400">
+                                            @error.ErrorId.Substring(0, Math.Min(12, error.ErrorId.Length))...
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                                            @error.ExceptionType
+                                        </td>
+                                        <td class="px-6 py-4 text-sm">
+                                            <span class="@GetSeverityClass(error.Severity) px-3 py-1 rounded-full text-sm font-medium">
+                                                @error.Severity
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 truncate">
+                                            @error.Message
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                            @error.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")
+                                        </td>
+                                        <td class="px-6 py-4 text-sm">
+                                            @if (error.NotificationSent)
+                                            {
+                                                <span class="text-green-600 dark:text-green-400">✅ Yes</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-gray-500 dark:text-gray-400">❌ No</span>
+                                            }
+                                        </td>
+                                        <td class="px-6 py-4 text-center">
+                                            <button @onclick="() => ShowDetails(error)" 
+                                                    class="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+                                                View Details
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination Info -->
+                <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                        Showing @(errors?.Count ?? 0) errors (Offset: @currentOffset)
+                    </p>
+                </div>
+            </div>
+        }
+
+        <!-- Details Modal -->
+        @if (selectedError != null)
+        {
+            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-96 overflow-y-auto">
+                    <!-- Modal Header -->
+                    <div class="sticky top-0 bg-gray-100 dark:bg-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600 flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-gray-900 dark:text-white">
+                            Error Details
+                        </h2>
+                        <button @onclick="() => selectedError = null" 
+                                class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl leading-none">
+                            ×
+                        </button>
+                    </div>
+
+                    <!-- Modal Body -->
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Error ID</h3>
+                            <p class="text-sm font-mono text-blue-600 dark:text-blue-400 break-all">@selectedError.ErrorId</p>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Exception Type</h3>
+                            <p class="text-sm text-gray-900 dark:text-white">@selectedError.ExceptionType</p>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Message</h3>
+                            <p class="text-sm text-gray-900 dark:text-white">@selectedError.Message</p>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Root Cause Analysis</h3>
+                            <p class="text-sm text-gray-900 dark:text-white">@selectedError.RootCauseAnalysis</p>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Recommended Actions</h3>
+                            <p class="text-sm text-gray-900 dark:text-white font-mono">@selectedError.RecommendedActions</p>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(selectedError.StackTrace))
+                        {
+                            <div>
+                                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Stack Trace</h3>
+                                <pre class="text-xs bg-gray-100 dark:bg-gray-700 p-3 rounded overflow-auto text-gray-900 dark:text-white">@selectedError.StackTrace</pre>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<RagApiClient.ErrorLog>? errors = new();
+    private RagApiClient.ErrorLog? selectedError;
+    private bool loading;
+    private string selectedSeverity = "";
+    private int currentLimit = 25;
+    private int currentOffset = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Logger.LogInformation("ErrorDashboard.OnInitializedAsync called");
+        // Initialize with empty list
+        errors ??= new List<RagApiClient.ErrorLog>();
+        Logger.LogInformation("About to call RefreshErrors");
+        await RefreshErrors();
+        Logger.LogInformation("RefreshErrors completed");
+    }
+
+    private async Task RefreshErrors()
+    {
+        loading = true;
+        try
+        {
+            Logger.LogInformation("=== RefreshErrors START ===");
+            Logger.LogInformation("selectedSeverity: {Severity}, currentLimit: {Limit}, currentOffset: {Offset}", 
+                selectedSeverity, currentLimit, currentOffset);
+
+            RagApiClient.ErrorLogsResponse? response = null;
+
+            if (!string.IsNullOrEmpty(selectedSeverity))
+            {
+                Logger.LogInformation("Calling GetErrorsBySeverityAsync with severity: {Severity}", selectedSeverity);
+                response = await ApiClient.GetErrorsBySeverityAsync(selectedSeverity);
+                Logger.LogInformation("GetErrorsBySeverityAsync returned: {Response}", response != null ? "success" : "null");
+            }
+            else
+            {
+                Logger.LogInformation("Calling GetErrorsAsync with limit: {Limit}, offset: {Offset}", currentLimit, currentOffset);
+                response = await ApiClient.GetErrorsAsync(currentLimit, currentOffset);
+                Logger.LogInformation("GetErrorsAsync returned: {Response}", response != null ? "success" : "null");
+            }
+
+            Logger.LogInformation("Response.Errors count: {Count}", response?.Errors?.Count ?? 0);
+
+            // Ensure errors is always a list, never null
+            errors = response?.Errors ?? new List<RagApiClient.ErrorLog>();
+            Logger.LogInformation("errors list updated with {Count} items", errors?.Count ?? 0);
+            Logger.LogInformation("=== RefreshErrors END ===");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "=== RefreshErrors EXCEPTION ===");
+            errors = new List<RagApiClient.ErrorLog>();
+        }
+        finally
+        {
+            loading = false;
+            Logger.LogInformation("Loading set to false");
+        }
+    }
+
+    private async Task OnSeverityChanged(ChangeEventArgs e)
+    {
+        Logger.LogInformation("OnSeverityChanged called with value: {Value}", e.Value);
+        selectedSeverity = e.Value?.ToString() ?? "";
+        currentOffset = 0;
+        Logger.LogInformation("About to call RefreshErrors");
+        await RefreshErrors();
+    }
+
+    private async Task OnLimitChanged(ChangeEventArgs e)
+    {
+        Logger.LogInformation("OnLimitChanged called with value: {Value}", e.Value);
+        currentLimit = int.Parse(e.Value?.ToString() ?? "25");
+        currentOffset = 0;
+        Logger.LogInformation("About to call RefreshErrors");
+        await RefreshErrors();
+    }
+
+    private void ShowDetails(RagApiClient.ErrorLog error)
+    {
+        selectedError = error;
+    }
+
+    private async Task OnRefreshClicked()
+    {
+        Logger.LogInformation("Refresh button clicked");
+        await RefreshErrors();
+    }
+
+    private string GetSeverityClass(string severity) => severity switch
+    {
+        "INFO" => "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+        "WARNING" => "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+        "ERROR" => "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+        "CRITICAL" => "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
+        _ => "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300"
+    };
+}

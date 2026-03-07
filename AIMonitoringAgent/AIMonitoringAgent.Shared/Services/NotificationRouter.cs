@@ -166,7 +166,8 @@ public class EmailNotifier : IEmailNotifier
                 senderAddress: fromAddress,
                 content: new EmailContent(subject)
                 {
-                    PlainText = body
+                    PlainText = body,
+                    Html = $"<html><body>{System.Net.WebUtility.HtmlEncode(body).Replace("\n", "<br>")}</body></html>"
                 },
                 recipients: new EmailRecipients(recipients.Select(r => new Azure.Communication.Email.EmailAddress(r)).ToList())
             );

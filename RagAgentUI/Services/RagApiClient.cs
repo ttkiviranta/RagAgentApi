@@ -157,4 +157,146 @@ public class RagApiClient
             return new AgentStatsResponse(new List<AgentStatDto>());
         }
     }
+
+    // Error Logging
+    public class ErrorLog
+    {
+        public Guid Id { get; set; }
+        public string ErrorId { get; set; } = string.Empty;
+        public string ExceptionType { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string? StackTrace { get; set; }
+        public string Severity { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string RootCauseAnalysis { get; set; } = string.Empty;
+        public string RecommendedActions { get; set; } = string.Empty;
+        public string AffectedOperations { get; set; } = string.Empty;
+        public string OperationName { get; set; } = string.Empty;
+        public string? RequestId { get; set; }
+        public bool IsRecurring { get; set; }
+        public int SimilarErrorCount { get; set; }
+        public int AffectedUsers { get; set; }
+        public DateTime Timestamp { get; set; }
+        public bool NotificationSent { get; set; }
+        public DateTime? NotificationSentAt { get; set; }
+        public string NotificationChannels { get; set; } = string.Empty;
+    }
+
+    public class ErrorLogsResponse
+    {
+        public int Count { get; set; }
+        public int Limit { get; set; }
+        public int Offset { get; set; }
+        public List<ErrorLog> Errors { get; set; } = new();
+    }
+
+    public async Task<ErrorLogsResponse> GetErrorsAsync(int limit = 50, int offset = 0)
+    {
+        try
+        {
+            _logger.LogInformation("[RagApiClient] GetErrorsAsync called with limit={Limit}, offset={Offset}", limit, offset);
+            var url = $"/api/error-logging-test/errors?limit={limit}&offset={offset}";
+            var fullUrl = $"{_httpClient.BaseAddress}{url}";
+            _logger.LogInformation("[RagApiClient] Calling {Url}", fullUrl);
+
+            var response = await _httpClient.GetAsync(url);
+            _logger.LogInformation("[RagApiClient] Response status: {StatusCode}", response.StatusCode);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation("[RagApiClient] Response content length: {Length}", content.Length);
+                _logger.LogDebug("[RagApiClient] Response content: {Content}", content);
+
+                var result = JsonSerializer.Deserialize<ErrorLogsResponse>(content, _jsonOptions) ??
+                    new ErrorLogsResponse();
+
+                _logger.LogInformation("[RagApiClient] Deserialized {Count} errors", result.Errors?.Count ?? 0);
+                return result;
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("[RagApiClient] Failed to get errors. Status: {Status}, Content: {Content}", 
+                    response.StatusCode, errorContent);
+            }
+
+            return new ErrorLogsResponse();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[RagApiClient] Exception in GetErrorsAsync");
+            return new ErrorLogsResponse();
+        }
+    }
+
+    public async Task<ErrorLog?> GetErrorByIdAsync(string errorId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/error-logging-test/errors/{errorId}");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<ErrorLog>(content, _jsonOptions);
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[RagApiClient] Failed to get error by ID: {ErrorId}", errorId);
+            return null;
+        }
+    }
+
+    public async Task<ErrorLogsResponse> GetErrorsBySeverityAsync(string severity)
+    {
+        try
+        {
+            _logger.LogInformation("[RagApiClient] GetErrorsBySeverityAsync called with severity={Severity}", severity);
+            var url = $"/api/error-logging-test/errors/by-severity/{severity}";
+            _logger.LogInformation("[RagApiClient] Calling {Url}", url);
+
+            var response = await _httpClient.GetAsync(url);
+            _logger.LogInformation("[RagApiClient] Response status: {StatusCode}", response.StatusCode);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation("[RagApiClient] Response content length: {Length}", content.Length);
+                _logger.LogDebug("[RagApiClient] Response content: {Content}", content);
+
+                var result = JsonSerializer.Deserialize<ErrorLogsResponse>(content, _jsonOptions) ??
+                    new ErrorLogsResponse();
+
+                _logger.LogInformation("[RagApiClient] Deserialized {Count} errors for severity {Severity}", 
+                    result.Errors?.Count ?? 0, severity);
+                return result;
+            }
+
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("[RagApiClient] Failed to get errors by severity. Status: {Status}, Content: {Content}", 
+                response.StatusCode, errorContent);
+            return new ErrorLogsResponse();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[RagApiClient] Exception in GetErrorsBySeverityAsync");
+            return new ErrorLogsResponse();
+        }
+    }
+
+    public async Task<bool> LogTestErrorAsync()
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync("/api/error-logging-test/log-test-error", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[RagApiClient] Failed to log test error");
+            return false;
+        }
+    }
 }

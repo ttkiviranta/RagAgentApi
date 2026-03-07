@@ -91,6 +91,9 @@ builder.Services.AddScoped<AgentSelectorService>();
 builder.Services.AddScoped<AgentFactory>();
 builder.Services.AddScoped<DatabaseSeedService>();
 
+// Error Logging Service
+builder.Services.AddScoped<IErrorLogService, ErrorLogService>();
+
 // Agents - Scoped for request lifecycle
 builder.Services.AddScoped<OrchestratorAgent>();
 builder.Services.AddScoped<ScraperAgent>();

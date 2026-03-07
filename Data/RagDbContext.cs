@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RagAgentApi.Models;
 using RagAgentApi.Models.PostgreSQL;
 using Pgvector.EntityFrameworkCore;
 
@@ -14,17 +15,20 @@ public class RagDbContext : DbContext
     }
 
     // DbSets
-  public DbSet<Document> Documents { get; set; }
+    public DbSet<Document> Documents { get; set; }
     public DbSet<DocumentChunk> DocumentChunks { get; set; }
     public DbSet<Conversation> Conversations { get; set; }
     public DbSet<Message> Messages { get; set; }
     public DbSet<AgentExecution> AgentExecutions { get; set; }
     public DbSet<AgentType> AgentTypes { get; set; }
     public DbSet<UrlAgentMapping> UrlAgentMappings { get; set; }
-    
+
     // Demo Services
     public DbSet<DemoExecution> DemoExecutions { get; set; }
     public DbSet<DemoTestData> DemoTestData { get; set; }
+
+    // Error Logging
+    public DbSet<ErrorLog> ErrorLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

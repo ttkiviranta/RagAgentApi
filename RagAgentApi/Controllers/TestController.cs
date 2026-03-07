@@ -99,14 +99,13 @@ public class TestController : ControllerBase
     {
         try
         {
-            var config = new Dictionary<string, object>
+            var config = new
             {
-                { "smtpServer", "smtp.gmail.com" },
-                { "smtpPort", 587 },
-                { "useTls", true },
-                { "fromAddress", "[Configured]" },
-                { "username", "[Configured]" },
-                { "passwordConfigured", true }
+                provider = "[Configured]",
+                fromAddress = "[Configured]",
+                fromName = "[Configured]",
+                azureConnectionStringConfigured = true,
+                sendGridApiKeyConfigured = true
             };
 
             return Ok(new
