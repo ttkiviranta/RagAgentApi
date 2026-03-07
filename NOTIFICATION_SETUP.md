@@ -1,52 +1,128 @@
 # Error Notification Configuration Guide
 
-## 📧 Email Notifications (Gmail/Office 365)
+## 📧 Email Notifications
 
-### Vaihe 1: Hanki Gmail App Password
+### Status: ✅ WORKING (Azure Communication Services)
 
-1. Avaa Google Account settings: https://myaccount.google.com
-2. Mene kohtaan "Security" (vasemmalla)
-3. Ota käyttöön "2-Step Verification" jos ei ole käytössä
-4. Valitse "App passwords" (näkyy vain jos 2-Step on käytössä)
-5. Valitse sovellukseksi "Mail" ja laitteeksi "Windows Computer"
-6. Kopioi generoitu 16-merkkinen salasana
+The application supports two email providers:
+1. **Azure Communication Services** (Primary - Production Ready)
+2. **SendGrid** (Fallback provider)
 
-### Vaihe 2: Päivitä appsettings.Development.json
+---
+
+## Azure Communication Services Setup
+
+### Prerequisites
+- Azure Communication Services resource created
+- Verified email address or domain linked
+
+### Configuration in appsettings.Development.json
 
 ```json
 "EmailSettings": {
-  "SmtpServer": "smtp.gmail.com",
-  "SmtpPort": 587,
-  "UseTls": true,
-  "FromAddress": "your-email@gmail.com",
+  "Provider": "AzureCommunicationServices",
+  "AzureCommunicationServicesConnectionString": "endpoint=https://YOUR-RESOURCE.communication.azure.com/;accesskey=YOUR_ACCESS_KEY",
+  "FromAddress": "your-verified-email@azurecomm.net",
   "FromName": "RAG Agent Alerts",
-  "Username": "your-email@gmail.com",
-  "Password": "xxxx xxxx xxxx xxxx"
+  "SendGridApiKey": "SG.xxxxx..." // Fallback only
 }
 ```
 
-### Vaihe 3: Ota Email notifications käyttöön
+### Verify Email Configuration
+```powershell
+# Test email sending
+curl -X POST 'https://localhost:7000/api/Test/send-test-email?email=your-email@example.com'
+# Expected response: {"message": "Test email sent successfully"}
+```
+
+### Known Requirements
+⚠️ **Important**: From address must be **verified/linked** in Azure Communication Services  
+- Visit Azure Portal → Communication Services → Email → Email domains
+- Verify ownership of sender domain or use verified email address
+
+---
+
+## SendGrid Fallback Setup
+
+If Azure CS is unavailable, change provider:
+
+```json
+"EmailSettings": {
+  "Provider": "SendGrid",
+  "SendGridApiKey": "SG.xxxxxxxxxxxxx",
+  "FromAddress": "noreply@yourdomain.com",
+  "FromName": "RAG Agent Alerts"
+}
+```
+
+Get API key: https://app.sendgrid.com/settings/api_keys
+
+---
+
+## Teams & Slack Notifications
+
+### Microsoft Teams
 
 ```json
 "NotificationConfigs": [
   {
-    "Id": "email-ops",
-    "Channel": "email",
+    "Id": "teams-dev",
+    "Channel": "teams",
     "Enabled": true,
-    "Recipients": ["team@company.com", "admin@company.com"],
-    "Description": "Send critical errors to operations email"
+    "WebhookUrl": "https://outlook.webhook.office.com/webhookb2/YOUR_WEBHOOK_URL",
+    "Description": "Send alerts to Teams development channel"
   }
 ]
 ```
 
-**Huomio:** Jos käytät Office 365 / Outlook:
+**Setup**: Teams → Apps → Incoming Webhook
+
+### Slack
+
 ```json
-"SmtpServer": "smtp.office365.com",
-"SmtpPort": 587,
-"Username": "your-email@company.com"
+"NotificationConfigs": [
+  {
+    "Id": "slack-alerts",
+    "Channel": "slack",
+    "Enabled": true,
+    "WebhookUrl": "https://hooks.slack.com/services/YOUR_WEBHOOK_URL",
+    "Description": "Send alerts to Slack channel"
+  }
+]
+```
+
+**Setup**: Slack → Apps → Incoming Webhooks
+
+---
+
+## Test Notifications
+
+Use ErrorDashboard or API endpoint:
+
+```bash
+# Send test email
+POST /api/test/send-test-email?email=test@example.com
+
+# Log test error
+POST /api/error-logging-test/log-test-error
+
+# View errors
+GET /api/error-logging-test/errors?limit=50&offset=0
 ```
 
 ---
+
+## Troubleshooting
+
+### "DomainNotLinked" Error
+❌ **Problem**: Sender domain not verified in Azure CS  
+✅ **Solution**: Verify domain in Azure Portal or use verified email address
+
+### Email not sent
+- Check appsettings.Development.json for correct connection string
+- Verify from address matches configured domain
+- Check Server logs for detailed error messages
+- Application Insights → Logs → filter by "email"
 
 ## 💬 Microsoft Teams Notifications
 
