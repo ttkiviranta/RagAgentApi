@@ -184,7 +184,8 @@ public class RagController : ControllerBase
                     ThreadId = threadId.ToString(),
                     State = new Dictionary<string, object>
                     {
-                        { "content", request.Content },
+                        { "raw_content", request.Content },  // ? FIX: Use "raw_content" key
+                        { "url", $"local://document/{request.Title}" },  // ? FIX: Add URL for storage
                         { "chunk_size", request.ChunkSize },
                         { "chunk_overlap", request.ChunkOverlap },
                         { "title", request.Title ?? "Uploaded Document" },
