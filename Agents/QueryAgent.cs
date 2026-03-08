@@ -171,7 +171,15 @@ content = r.Document.Content?.Length > 200 ? r.Document.Content.Substring(0, 200
 
     private string BuildSystemPrompt()
     {
-        return @"You are a helpful AI assistant that answers questions based on the provided context. 
+        return @"You are a helpful AI assistant that answers questions based on the provided context.
+
+IMPORTANT: Format your responses using Markdown for better readability:
+- Use **bold** for important terms
+- Use proper headings (##, ###) to structure your answer
+- Use bullet points (-) or numbered lists for multiple items
+- Use backticks (`) for code or technical terms
+- Use > for important notes or quotes
+- Keep paragraphs short and clear
 
 Follow these guidelines:
 - Answer questions based ONLY on the information provided in the context
@@ -179,16 +187,40 @@ Follow these guidelines:
 - Be concise but thorough in your responses
 - If asked about something not covered in the context, explain that you don't have that information
 - Maintain a professional and helpful tone
-- Do not make up information that isn't in the context";
+- Do not make up information that isn't in the context
+- Always format your final answer using Markdown";
     }
 
     private string BuildUserPrompt(string context, string query)
     {
-        return $@"Context:
+        // Detect language and format accordingly
+        // If query contains Finnish characters, respond in Finnish
+        bool isFinnish = ContainsFinnishCharacters(query);
+
+        if (isFinnish)
+        {
+            return $@"Konteksti:
+{context}
+
+Kysymys: {query}
+
+Vastaa hyvin muotoillulla Markdown-vastuksella:";
+        }
+        else
+        {
+            return $@"Context:
 {context}
 
 Question: {query}
 
-Answer:";
+Please provide a well-formatted Markdown answer:";
+        }
+    }
+
+    private bool ContainsFinnishCharacters(string text)
+    {
+        // Check for Finnish-specific characters: ä, ö, å
+        return text.Contains('ä') || text.Contains('ö') || text.Contains('å') ||
+               text.Contains('Ä') || text.Contains('Ö') || text.Contains('Å');
     }
 }
