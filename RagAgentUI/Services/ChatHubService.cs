@@ -26,35 +26,44 @@ public async Task ConnectAsync()
 
         _hubConnection.On<string>("ReceiveChunk", async (chunk) =>
  {
+   Console.WriteLine($"[ChatHubService] ReceiveChunk event fired: {chunk.Length} chars");
    if (OnMessageChunkReceived != null)
        await OnMessageChunkReceived.Invoke(chunk);
+   else
+       Console.WriteLine("[ChatHubService] OnMessageChunkReceived is null!");
    });
 
         _hubConnection.On<string>("ReceiveSources", async (sourcesJson) =>  // ← NEW
         {
+            Console.WriteLine($"[ChatHubService] ReceiveSources event fired: {sourcesJson.Length} chars");
             if (OnSourcesReceived != null)
                 await OnSourcesReceived.Invoke(sourcesJson);
+            else
+                Console.WriteLine("[ChatHubService] OnSourcesReceived is null!");
         });
 
         _hubConnection.On("ReceiveComplete", async () =>
         {
+         Console.WriteLine("[ChatHubService] ReceiveComplete event fired");
          if (OnMessageComplete != null)
    await OnMessageComplete.Invoke();
         });
 
         _hubConnection.On<string>("ReceiveError", async (error) =>
         {
+   Console.WriteLine($"[ChatHubService] ReceiveError event fired: {error}");
    if (OnError != null)
        await OnError.Invoke(error);
         });
 
         try
         {
+            Console.WriteLine("[ChatHubService] Starting connection...");
 await _hubConnection.StartAsync();
+            Console.WriteLine("[ChatHubService] Connection started successfully");
         }
     catch (Exception ex)
         {
- // For now, just log - in production, implement proper logging
             Console.WriteLine($"SignalR connection failed: {ex.Message}");
    }
     }

@@ -173,19 +173,24 @@
     {
         try
         {
+            Console.WriteLine("[Home] OnInitializedAsync starting");
+
             // ← ATTACH HANDLERS FIRST (before connecting!)
 
             // Handle incoming message chunks
             ChatHub.OnMessageChunkReceived += async (chunk) =>
             {
+                Console.WriteLine($"[Home] Handler: OnMessageChunkReceived fired with {chunk.Length} chars");
                 streamingMessage += chunk;
                 await InvokeAsync(StateHasChanged);
                 await ScrollToBottom();
             };
+            Console.WriteLine("[Home] OnMessageChunkReceived handler attached");
 
             // ← Handle incoming sources
             ChatHub.OnSourcesReceived += async (sourcesJson) =>
             {
+                Console.WriteLine($"[Home] Handler: OnSourcesReceived fired with {sourcesJson.Length} chars");
                 try
                 {
                     currentSources = System.Text.Json.JsonSerializer.Deserialize<List<SourceDto>>(sourcesJson) ?? new();
@@ -196,9 +201,11 @@
                     await JS.InvokeVoidAsync("debugLog.error", $"[Home] Error deserializing sources: {ex.Message}");
                 }
             };
+            Console.WriteLine("[Home] OnSourcesReceived handler attached");
 
             ChatHub.OnMessageComplete += async () =>
             {
+                Console.WriteLine("[Home] Handler: OnMessageComplete fired");
                 await JS.InvokeVoidAsync("debugLog.log", "[Home] Message complete");
                 isStreaming = false;
 
@@ -237,17 +244,22 @@
                 await InvokeAsync(StateHasChanged);
                 await ScrollToBottom();
             };
+            Console.WriteLine("[Home] OnMessageComplete handler attached");
 
             ChatHub.OnError += async (error) =>
             {
+                Console.WriteLine($"[Home] Handler: OnError fired with: {error}");
                 await JS.InvokeVoidAsync("debugLog.error", $"[Home] ChatHub error: {error}");
                 errorMessage = error;
                 isStreaming = false;
                 await InvokeAsync(StateHasChanged);
             };
+            Console.WriteLine("[Home] OnError handler attached");
 
             // ← NOW connect (after handlers are attached!)
+            Console.WriteLine("[Home] Calling ConnectAsync...");
             await ChatHub.ConnectAsync();
+            Console.WriteLine("[Home] ConnectAsync completed");
 
             await LoadConversations();
 
@@ -258,6 +270,7 @@
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[Home] Exception: {ex}");
             errorMessage = $"Initialization error: {ex.Message}";
         }
     }
