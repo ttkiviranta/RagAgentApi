@@ -142,20 +142,26 @@ Be concise, accurate, and helpful. If you're not certain about something, say so
                 
                 // Send sources in real-time
                 var sourcesJson = System.Text.Json.JsonSerializer.Serialize(sources);
+                _logger.LogInformation("[ChatHub] Sending ReceiveSources with {Count} sources", sources.Count);
                 await Clients.Caller.SendAsync("ReceiveSources", sourcesJson);
-                
+
                 // Add prefix to indicate document-based answer
                 var prefix = "📄 **Vastaus dokumenttien perusteella:**\n\n";
+                _logger.LogInformation("[ChatHub] Sending ReceiveChunk (prefix): {Length} chars", prefix.Length);
                 await Clients.Caller.SendAsync("ReceiveChunk", prefix);
                 fullAnswer = prefix;
-                
+
                 // Stream answer from Azure OpenAI with context
+                int chunkCount = 0;
                 await foreach (var chunk in _openAI.GetChatCompletionStreamAsync(query, context))
                 {
                     fullAnswer += chunk;
+                    chunkCount++;
+                    _logger.LogDebug("[ChatHub] Sending ReceiveChunk #{ChunkNum}: {Length} chars", chunkCount, chunk.Length);
                     await Clients.Caller.SendAsync("ReceiveChunk", chunk);
                 }
-                
+                _logger.LogInformation("[ChatHub] Sent {ChunkCount} chunks total", chunkCount);
+
                 _logger.LogInformation("[ChatHub] Generated answer with {SourceCount} sources", sources.Count);
             }
             
@@ -182,7 +188,8 @@ Be concise, accurate, and helpful. If you're not certain about something, say so
                 conversation.MessageCount, conversationId);
             
             await _db.SaveChangesAsync();
-            
+
+            _logger.LogInformation("[ChatHub] Sending ReceiveComplete");
             await Clients.Caller.SendAsync("ReceiveComplete");
         }
         catch (Exception ex)
