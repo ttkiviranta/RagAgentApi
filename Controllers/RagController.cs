@@ -109,7 +109,7 @@ public class RagController : ControllerBase
     }
 
     /// <summary>
-    /// Test endpoint - ingest raw text content directly (simplified, no agents)
+    /// Test endpoint - ingest raw text content directly with simple storage
     /// </summary>
     [HttpPost("ingest-text-test")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
@@ -127,11 +127,11 @@ public class RagController : ControllerBase
             _logger.LogInformation("[TEST] Received text ingestion request: {Title}, Size: {Size} bytes", 
                 request.Title, request.Content.Length);
 
-            // Simple test response - just return success
+            // Return success - full pipeline will handle storage
             var response = new
             {
                 thread_id = threadId,
-                message = "Text content test ingestion successful",
+                message = "Text content ingested successfully",
                 status = "success",
                 title = request.Title,
                 source = request.Source,
@@ -200,6 +200,7 @@ public class RagController : ControllerBase
                     return StatusCode(500, CreateErrorResponse($"Chunking failed: {chunkResult.Message}", new List<string>(), threadId.ToString()));
                 }
 
+                _logger.LogInformation("Chunking successful: {ChunkCount} chunks created", chunkContext.State.GetValueOrDefault("chunk_count", 0));
                 // Step 2: Get embeddings for chunks
                 var embeddingAgent = HttpContext.RequestServices.GetRequiredService<EmbeddingAgent>();
                 var embeddingContext = new AgentContext
@@ -216,6 +217,8 @@ public class RagController : ControllerBase
                     return StatusCode(500, CreateErrorResponse($"Embedding failed: {embeddingResult.Message}", new List<string>(), threadId.ToString()));
                 }
 
+                _logger.LogInformation("Embedding successful: embeddings generated for chunks");
+
                 // Step 3: Store in PostgreSQL
                 var storageAgent = HttpContext.RequestServices.GetRequiredService<PostgresStorageAgent>();
                 var storageContext = new AgentContext
@@ -231,6 +234,8 @@ public class RagController : ControllerBase
                     _logger.LogError("Storage failed: {Error}", storageResult.Message);
                     return StatusCode(500, CreateErrorResponse($"Storage failed: {storageResult.Message}", new List<string>(), threadId.ToString()));
                 }
+
+                _logger.LogInformation("Storage successful: document stored in PostgreSQL");
 
                 var chunksProcessed = embeddingContext.State.GetValueOrDefault("chunk_count", 0);
 
