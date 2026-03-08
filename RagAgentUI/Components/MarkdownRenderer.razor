@@ -1,0 +1,35 @@
+@using Markdig
+@implements IAsyncDisposable
+
+@((MarkupString)renderedHtml)
+
+@code {
+    [Parameter]
+    public string MarkdownContent { get; set; } = string.Empty;
+
+    private string renderedHtml = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Task.Run(() =>
+        {
+            if (!string.IsNullOrWhiteSpace(MarkdownContent))
+            {
+                var pipeline = new MarkdownPipelineBuilder()
+                    .UseAdvancedExtensions()
+                    .Build();
+                
+                renderedHtml = Markdown.ToHtml(MarkdownContent, pipeline);
+            }
+            else
+            {
+                renderedHtml = string.Empty;
+            }
+        });
+    }
+
+    async ValueTask IAsyncDisposable.DisposeAsync()
+    {
+        await Task.CompletedTask;
+    }
+}

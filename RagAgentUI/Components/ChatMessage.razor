@@ -3,7 +3,7 @@
 <div class="@(IsUser ? "flex justify-end" : "flex justify-start") mb-4 animate-fade-in">
     <div class="@(IsUser ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white") 
  max-w-[75%] rounded-2xl px-4 py-3 shadow-sm">
-        
+
         <div class="flex items-center gap-2 mb-1">
 <span class="text-xs font-semibold opacity-90">
      @(IsUser ? "You" : "🤖 Assistant")
@@ -12,11 +12,24 @@
  @CreatedAt.ToString("HH:mm")
          </span>
         </div>
-  
-     <div class="prose prose-sm max-w-none @(IsUser ? "prose-invert" : "")">
-      @((MarkupString)Content)
-        </div>
-  
+
+     @if (IsUser)
+     {
+         <!-- User messages: plain text -->
+         <div class="whitespace-pre-wrap break-words">
+             @Content
+         </div>
+     }
+     else
+     {
+         <!-- Assistant messages: render as Markdown -->
+         <div class="prose prose-sm max-w-none @(IsUser ? "prose-invert" : "") 
+             prose-headings:font-bold prose-h2:text-base prose-h3:text-sm
+             prose-p:my-2 prose-li:my-1 prose-code:bg-opacity-20 prose-code:px-2 prose-code:py-1 prose-code:rounded">
+             <MarkdownRenderer MarkdownContent="@Content" />
+         </div>
+     }
+
         @if (Sources?.Any() == true)
         {
      <div class="mt-3 pt-3 border-t @(IsUser ? "border-white/20" : "border-gray-300")">
