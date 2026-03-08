@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.Components.Web
 @inject RagApiClient ApiClient
 @inject ChatHubService ChatHub
+@inject IJSRuntime JS
 @implements IAsyncDisposable
 
 <!-- DEBUG: Show that component is loaded -->
@@ -172,21 +173,21 @@
     {
         try
         {
-            Console.WriteLine("[Home] Connecting to ChatHub...");
+            await JS.InvokeVoidAsync("debugLog.log", "[Home] Connecting to ChatHub...");
             await ChatHub.ConnectAsync();
-            Console.WriteLine($"[Home] ChatHub connected: {ChatHub.IsConnected}");
+            await JS.InvokeVoidAsync("debugLog.log", $"[Home] ChatHub connected: {ChatHub.IsConnected}");
 
             // Wait a moment to ensure connection is established
             if (!ChatHub.IsConnected)
             {
                 await Task.Delay(500);
-                Console.WriteLine($"[Home] ChatHub still not connected after delay");
+                await JS.InvokeVoidAsync("debugLog.log", "[Home] ChatHub still not connected after delay");
             }
 
             // Handle incoming message chunks
             ChatHub.OnMessageChunkReceived += async (chunk) =>
             {
-                Console.WriteLine($"[Home] Received chunk: {chunk.Length} chars");
+                await JS.InvokeVoidAsync("debugLog.log", $"[Home] Received chunk: {chunk.Length} chars");
                 streamingMessage += chunk;
                 await InvokeAsync(StateHasChanged);
                 await ScrollToBottom();
@@ -195,28 +196,28 @@
             // ← NEW: Handle incoming sources
             ChatHub.OnSourcesReceived += async (sourcesJson) =>
             {
-                Console.WriteLine($"[Home] Received sources: {sourcesJson.Length} chars");
+                await JS.InvokeVoidAsync("debugLog.log", $"[Home] Received sources: {sourcesJson.Length} chars");
                 try
                 {
                     currentSources = System.Text.Json.JsonSerializer.Deserialize<List<SourceDto>>(sourcesJson) ?? new();
-                    Console.WriteLine($"[Home] Deserialized {currentSources.Count} sources");
+                    await JS.InvokeVoidAsync("debugLog.log", $"[Home] Deserialized {currentSources.Count} sources");
                     await InvokeAsync(StateHasChanged);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[Home] Error deserializing sources: {ex.Message}");
+                    await JS.InvokeVoidAsync("debugLog.error", $"[Home] Error deserializing sources: {ex.Message}");
                 }
             };
 
             ChatHub.OnMessageComplete += async () =>
             {
-                Console.WriteLine("[Home] Message complete");
+                await JS.InvokeVoidAsync("debugLog.log", "[Home] Message complete");
                 isStreaming = false;
 
                 // Add the completed streaming message to messages list
                 if (!string.IsNullOrEmpty(streamingMessage) && currentConversationId.HasValue)
                 {
-                    Console.WriteLine($"[Home] Adding streaming message to list: {streamingMessage.Length} chars");
+                    await JS.InvokeVoidAsync("debugLog.log", $"[Home] Adding streaming message to list: {streamingMessage.Length} chars");
                     // Fetch only the latest assistant message from database
                     var history = await ApiClient.GetConversationHistoryAsync(currentConversationId.Value);
                     var latestAssistantMessage = history
@@ -230,7 +231,7 @@
                         // Use currentSources if available
                         if (currentSources?.Any() == true)
                         {
-                            Console.WriteLine($"[Home] Attaching {currentSources.Count} sources to message");
+                            await JS.InvokeVoidAsync("debugLog.log", $"[Home] Attaching {currentSources.Count} sources to message");
                             latestAssistantMessage = latestAssistantMessage with { Sources = currentSources };
                         }
 
@@ -251,7 +252,7 @@
 
             ChatHub.OnError += async (error) =>
             {
-                Console.WriteLine($"[Home] ChatHub error: {error}");
+                await JS.InvokeVoidAsync("debugLog.error", $"[Home] ChatHub error: {error}");
                 errorMessage = error;
                 isStreaming = false;
                 await InvokeAsync(StateHasChanged);
@@ -266,7 +267,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Home] Exception in OnInitializedAsync: {ex.Message}");
+            await JS.InvokeVoidAsync("debugLog.error", $"[Home] Exception in OnInitializedAsync: {ex.Message}");
             errorMessage = $"Initialization error: {ex.Message}";
         }
     }
