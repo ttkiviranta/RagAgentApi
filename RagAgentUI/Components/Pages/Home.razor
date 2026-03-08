@@ -165,80 +165,104 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await ChatHub.ConnectAsync();
-
-        // Handle incoming message chunks
-        ChatHub.OnMessageChunkReceived += async (chunk) =>
+        try
         {
-            streamingMessage += chunk;
-            await InvokeAsync(StateHasChanged);
-            await ScrollToBottom();
-        };
+            Console.WriteLine("[Home] Connecting to ChatHub...");
+            await ChatHub.ConnectAsync();
+            Console.WriteLine($"[Home] ChatHub connected: {ChatHub.IsConnected}");
 
-        // ← NEW: Handle incoming sources
-        ChatHub.OnSourcesReceived += async (sourcesJson) =>
-        {
-            try
+            // Wait a moment to ensure connection is established
+            if (!ChatHub.IsConnected)
             {
-                currentSources = System.Text.Json.JsonSerializer.Deserialize<List<SourceDto>>(sourcesJson) ?? new();
+                await Task.Delay(500);
+                Console.WriteLine($"[Home] ChatHub still not connected after delay");
+            }
+
+            // Handle incoming message chunks
+            ChatHub.OnMessageChunkReceived += async (chunk) =>
+            {
+                Console.WriteLine($"[Home] Received chunk: {chunk.Length} chars");
+                streamingMessage += chunk;
                 await InvokeAsync(StateHasChanged);
-            }
-            catch (Exception ex)
+                await ScrollToBottom();
+            };
+
+            // ← NEW: Handle incoming sources
+            ChatHub.OnSourcesReceived += async (sourcesJson) =>
             {
-                Console.WriteLine($"Error deserializing sources: {ex.Message}");
-            }
-        };
-
-        ChatHub.OnMessageComplete += async () =>
-        {
-            isStreaming = false;
-
-            // Add the completed streaming message to messages list
-            if (!string.IsNullOrEmpty(streamingMessage) && currentConversationId.HasValue)
-            {
-                // Fetch only the latest assistant message from database
-                var history = await ApiClient.GetConversationHistoryAsync(currentConversationId.Value);
-                var latestAssistantMessage = history
-                    .Where(m => m.Role == "assistant")
-                    .OrderByDescending(m => m.CreatedAt)
-                    .FirstOrDefault();
-
-                if (latestAssistantMessage != null && 
-                    !messages!.Any(m => m.Id == latestAssistantMessage.Id))
+                Console.WriteLine($"[Home] Received sources: {sourcesJson.Length} chars");
+                try
                 {
-                    // Use currentSources if available
-                    if (currentSources?.Any() == true)
-                    {
-                        latestAssistantMessage = latestAssistantMessage with { Sources = currentSources };
-                    }
-
-                    messages!.Add(latestAssistantMessage);
+                    currentSources = System.Text.Json.JsonSerializer.Deserialize<List<SourceDto>>(sourcesJson) ?? new();
+                    Console.WriteLine($"[Home] Deserialized {currentSources.Count} sources");
+                    await InvokeAsync(StateHasChanged);
                 }
-            }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Home] Error deserializing sources: {ex.Message}");
+                }
+            };
 
-            streamingMessage = string.Empty;
-            currentSources = new();  // ← Reset sources for next message
+            ChatHub.OnMessageComplete += async () =>
+            {
+                Console.WriteLine("[Home] Message complete");
+                isStreaming = false;
 
-            // Reload conversations list to update message count
+                // Add the completed streaming message to messages list
+                if (!string.IsNullOrEmpty(streamingMessage) && currentConversationId.HasValue)
+                {
+                    Console.WriteLine($"[Home] Adding streaming message to list: {streamingMessage.Length} chars");
+                    // Fetch only the latest assistant message from database
+                    var history = await ApiClient.GetConversationHistoryAsync(currentConversationId.Value);
+                    var latestAssistantMessage = history
+                        .Where(m => m.Role == "assistant")
+                        .OrderByDescending(m => m.CreatedAt)
+                        .FirstOrDefault();
+
+                    if (latestAssistantMessage != null && 
+                        !messages!.Any(m => m.Id == latestAssistantMessage.Id))
+                    {
+                        // Use currentSources if available
+                        if (currentSources?.Any() == true)
+                        {
+                            Console.WriteLine($"[Home] Attaching {currentSources.Count} sources to message");
+                            latestAssistantMessage = latestAssistantMessage with { Sources = currentSources };
+                        }
+
+                        messages!.Add(latestAssistantMessage);
+                    }
+                }
+
+                streamingMessage = string.Empty;
+                currentSources = new();  // ← Reset sources for next message
+
+                // Reload conversations list to update message count
+                await LoadConversations();
+
+                // ← IMPORTANT: StateHasChanged + scroll
+                await InvokeAsync(StateHasChanged);
+                await ScrollToBottom();
+            };
+
+            ChatHub.OnError += async (error) =>
+            {
+                Console.WriteLine($"[Home] ChatHub error: {error}");
+                errorMessage = error;
+                isStreaming = false;
+                await InvokeAsync(StateHasChanged);
+            };
+
             await LoadConversations();
 
-            // ← IMPORTANT: StateHasChanged + scroll
-            await InvokeAsync(StateHasChanged);
-            await ScrollToBottom();
-        };
-
-        ChatHub.OnError += async (error) =>
+            if (conversations?.Any() == true)
+            {
+                await LoadConversation(conversations.First().Id);
+            }
+        }
+        catch (Exception ex)
         {
-            errorMessage = error;
-            isStreaming = false;
-            await InvokeAsync(StateHasChanged);
-        };
-
-        await LoadConversations();
-
-        if (conversations?.Any() == true)
-        {
-            await LoadConversation(conversations.First().Id);
+            Console.WriteLine($"[Home] Exception in OnInitializedAsync: {ex.Message}");
+            errorMessage = $"Initialization error: {ex.Message}";
         }
     }
 
