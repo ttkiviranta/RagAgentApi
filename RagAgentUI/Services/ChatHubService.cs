@@ -6,41 +6,48 @@ public class ChatHubService : IAsyncDisposable
 {
     private readonly IConfiguration _configuration;
     private HubConnection? _hubConnection;
-    
+
     public event Func<string, Task>? OnMessageChunkReceived;
+    public event Func<string, Task>? OnSourcesReceived;  // ← NEW: Sources real-time
     public event Func<Task>? OnMessageComplete;
     public event Func<string, Task>? OnError;
-    
+
     public ChatHubService(IConfiguration configuration)
     {
         _configuration = configuration;
     }
-    
+
 public async Task ConnectAsync()
     {
         _hubConnection = new HubConnectionBuilder()
  .WithUrl(_configuration["ApiSettings:SignalRHub"] ?? "http://localhost:5000/chathub")
 .WithAutomaticReconnect()
             .Build();
-        
+
         _hubConnection.On<string>("ReceiveChunk", async (chunk) =>
  {
    if (OnMessageChunkReceived != null)
        await OnMessageChunkReceived.Invoke(chunk);
    });
-  
+
+        _hubConnection.On<string>("ReceiveSources", async (sourcesJson) =>  // ← NEW
+        {
+            if (OnSourcesReceived != null)
+                await OnSourcesReceived.Invoke(sourcesJson);
+        });
+
         _hubConnection.On("ReceiveComplete", async () =>
         {
          if (OnMessageComplete != null)
    await OnMessageComplete.Invoke();
         });
-     
+
         _hubConnection.On<string>("ReceiveError", async (error) =>
         {
    if (OnError != null)
        await OnError.Invoke(error);
         });
-     
+
         try
         {
 await _hubConnection.StartAsync();

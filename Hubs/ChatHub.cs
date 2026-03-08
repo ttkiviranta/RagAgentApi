@@ -104,8 +104,8 @@ public class ChatHub : Hub
                 else
                 {
                     // Hybrid mode: Use general ChatGPT knowledge with disclaimer
-                    var disclaimerPrefix = "?? Dokumenteista ei löytynyt tietoa. Vastaan yleisen tietämykseni perusteella:\n\n";
-                    
+                    var disclaimerPrefix = "?? **Dokumenteista ei löytynyt tietoa.** Vastaan yleisen tietämykseni perusteella:\n\n";
+
                     // Send disclaimer first
                     await Clients.Caller.SendAsync("ReceiveChunk", disclaimerPrefix);
                     await Task.Delay(100);
@@ -126,28 +126,33 @@ Be concise, accurate, and helpful. If you're not certain about something, say so
                 
                 sources = new List<SourceDto>();
             }
-            else
+            // Documents found - use RAG with context
+            var context = string.Join("\n\n", searchResults.Select(r => r.Content));
+
+            _logger.LogDebug("[ChatHub] Context length: {Length} characters", context.Length);
+
+            // Prepare sources immediately
+            sources = searchResults.Select(r => new SourceDto(
+                Url: r.SourceUrl ?? "",
+                Content: r.Content.Length > 200 ? r.Content.Substring(0, 200) + "..." : r.Content,
+                RelevanceScore: r.Score ?? 0
+            )).ToList();
+
+            // Send sources in real-time
+            var sourcesJson = System.Text.Json.JsonSerializer.Serialize(sources);
+            await Clients.Caller.SendAsync("ReceiveSources", sourcesJson);
+
+            // Add prefix to indicate document-based answer
+            var prefix = "?? **Vastaus dokumenttien perusteella:**\n\n";
+            await Clients.Caller.SendAsync("ReceiveChunk", prefix);
+            fullAnswer = prefix;
+
+            // Stream answer from Azure OpenAI with context
+            await foreach (var chunk in _openAI.GetChatCompletionStreamAsync(query, context))
             {
-                // Documents found - use RAG with context
-                var context = string.Join("\n\n", searchResults.Select(r => r.Content));
-                
-                _logger.LogDebug("[ChatHub] Context length: {Length} characters", context.Length);
-                
-                // Add prefix to indicate document-based answer
-                var prefix = "?? Vastaus dokumenttien perusteella:\n\n";
-                await Clients.Caller.SendAsync("ReceiveChunk", prefix);
-                fullAnswer = prefix;
-                
-                // Stream answer from Azure OpenAI with context
-                await foreach (var chunk in _openAI.GetChatCompletionStreamAsync(query, context))
-                {
-                    fullAnswer += chunk;
-                    await Clients.Caller.SendAsync("ReceiveChunk", chunk);
-                }
-                
-                // Convert search results to SourceDto with proper relevance scores
-                sources = searchResults.Select(r => new SourceDto(
-                    Url: r.SourceUrl ?? "",
+                fullAnswer += chunk;
+                await Clients.Caller.SendAsync("ReceiveChunk", chunk);
+            }
                     Content: r.Content.Length > 100 ? r.Content[..100] + "..." : r.Content,
                     RelevanceScore: r.RelevanceScore
                 )).ToList();
