@@ -36,6 +36,9 @@ public class ChatHub : Hub
     {
         try
         {
+            _logger.LogInformation("[ChatHub] StreamQuery called with query: '{Query}', conversationId: {ConvId}", 
+                query.Substring(0, Math.Min(50, query.Length)), conversationId);
+
             // Get conversation at the beginning with tracking
             var conversation = await _db.Conversations
                 .FirstOrDefaultAsync(c => c.Id == conversationId);
@@ -194,7 +197,7 @@ Be concise, accurate, and helpful. If you're not certain about something, say so
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[ChatHub] Error processing query: '{Query}'", query);
+            _logger.LogError(ex, "[ChatHub] EXCEPTION in StreamQuery: {Message}\n{StackTrace}", ex.Message, ex.StackTrace);
             await Clients.Caller.SendAsync("ReceiveError", $"Virhe: {ex.Message}");
         }
     }
