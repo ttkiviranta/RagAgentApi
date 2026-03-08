@@ -8,10 +8,10 @@ namespace RagAgentApi.Models;
 public class RagRequest
 {
     /// <summary>
-    /// URL to scrape and ingest
+    /// URL or resource identifier to scrape and ingest
+    /// Can be an HTTP URL or a local resource identifier (e.g., local://document/filename)
     /// </summary>
     [Required]
-    [Url]
     public string Url { get; set; } = string.Empty;
 
     /// <summary>

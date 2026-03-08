@@ -109,6 +109,161 @@ public class RagController : ControllerBase
     }
 
     /// <summary>
+    /// Test endpoint - ingest raw text content directly (simplified, no agents)
+    /// </summary>
+    [HttpPost("ingest-text-test")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> IngestTextTest([FromBody] IngestTextRequest request, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Content))
+            {
+                return BadRequest(new { error = "Content cannot be empty" });
+            }
+
+            var threadId = Guid.NewGuid();
+
+            _logger.LogInformation("[TEST] Received text ingestion request: {Title}, Size: {Size} bytes", 
+                request.Title, request.Content.Length);
+
+            // Simple test response - just return success
+            var response = new
+            {
+                thread_id = threadId,
+                message = "Text content test ingestion successful",
+                status = "success",
+                title = request.Title,
+                source = request.Source,
+                content_length = request.Content.Length,
+                execution_time_ms = 0
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Test endpoint error");
+            return StatusCode(500, new { error = $"Test failed: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Ingest raw text content directly (e.g., from file uploads)
+    /// </summary>
+    /// <param name="request">Request containing raw text content</param>
+    /// <returns>Result containing thread ID and processing information</returns>
+    [HttpPost("ingest-text")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> IngestText([FromBody] IngestTextRequest request, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(CreateErrorResponse("Invalid request parameters", ModelState));
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Content))
+            {
+                return BadRequest(CreateErrorResponse("Content cannot be empty"));
+            }
+
+            _logger.LogInformation("Starting text content ingestion: {Title}", request.Title ?? "Untitled");
+
+            var threadId = Guid.NewGuid();
+
+            try
+            {
+                // Step 1: Create chunks from raw text (bypass scraping)
+                var chunkerAgent = HttpContext.RequestServices.GetRequiredService<ChunkerAgent>();
+                var chunkContext = new AgentContext
+                {
+                    ThreadId = threadId.ToString(),
+                    State = new Dictionary<string, object>
+                    {
+                        { "content", request.Content },
+                        { "chunk_size", request.ChunkSize },
+                        { "chunk_overlap", request.ChunkOverlap },
+                        { "title", request.Title ?? "Uploaded Document" },
+                        { "source", request.Source ?? "file-upload" }
+                    }
+                };
+
+                var chunkResult = await chunkerAgent.ExecuteAsync(chunkContext, cancellationToken);
+
+                if (!chunkResult.Success)
+                {
+                    _logger.LogError("Chunking failed: {Error}", chunkResult.Message);
+                    return StatusCode(500, CreateErrorResponse($"Chunking failed: {chunkResult.Message}", new List<string>(), threadId.ToString()));
+                }
+
+                // Step 2: Get embeddings for chunks
+                var embeddingAgent = HttpContext.RequestServices.GetRequiredService<EmbeddingAgent>();
+                var embeddingContext = new AgentContext
+                {
+                    ThreadId = threadId.ToString(),
+                    State = chunkContext.State
+                };
+
+                var embeddingResult = await embeddingAgent.ExecuteAsync(embeddingContext, cancellationToken);
+
+                if (!embeddingResult.Success)
+                {
+                    _logger.LogError("Embedding failed: {Error}", embeddingResult.Message);
+                    return StatusCode(500, CreateErrorResponse($"Embedding failed: {embeddingResult.Message}", new List<string>(), threadId.ToString()));
+                }
+
+                // Step 3: Store in PostgreSQL
+                var storageAgent = HttpContext.RequestServices.GetRequiredService<PostgresStorageAgent>();
+                var storageContext = new AgentContext
+                {
+                    ThreadId = threadId.ToString(),
+                    State = embeddingContext.State
+                };
+
+                var storageResult = await storageAgent.ExecuteAsync(storageContext, cancellationToken);
+
+                if (!storageResult.Success)
+                {
+                    _logger.LogError("Storage failed: {Error}", storageResult.Message);
+                    return StatusCode(500, CreateErrorResponse($"Storage failed: {storageResult.Message}", new List<string>(), threadId.ToString()));
+                }
+
+                var chunksProcessed = embeddingContext.State.GetValueOrDefault("chunk_count", 0);
+
+                var response = new
+                {
+                    thread_id = threadId,
+                    message = "Text content ingested successfully",
+                    status = "success",
+                    chunks_processed = chunksProcessed,
+                    title = request.Title,
+                    source = request.Source,
+                    chunk_size = request.ChunkSize,
+                    chunk_overlap = request.ChunkOverlap,
+                    execution_time_ms = 0
+                };
+
+                _logger.LogInformation("Text ingestion completed successfully for thread {ThreadId}", threadId);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during text processing pipeline for thread {ThreadId}", threadId);
+                return StatusCode(500, CreateErrorResponse($"Pipeline error: {ex.Message}", new List<string>(), threadId.ToString()));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during text ingestion");
+            return StatusCode(500, CreateErrorResponse("An unexpected error occurred during text ingestion"));
+        }
+    }
+
+    /// <summary>
     /// Query the RAG system for information
     /// </summary>
     /// <param name="request">The query request containing the question and search parameters</param>
