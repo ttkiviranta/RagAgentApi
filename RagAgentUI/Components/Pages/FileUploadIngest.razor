@@ -3,6 +3,8 @@
 @using RagAgentUI.Models
 @using System.IO
 @using System.Text
+@using iText.Kernel.Pdf
+@using iText.Kernel.Pdf.Canvas.Parser
 @inject RagApiClient ApiClient
 @inject ILogger<FileUploadIngest> Logger
 
@@ -373,6 +375,50 @@ You can now:
         catch
         {
             return "http://localhost:5000";
+        }
+    }
+
+    private string ExtractPdfText(byte[] fileBytes)
+    {
+        try
+        {
+            var extractedText = new StringBuilder();
+
+            using (var reader = new PdfReader(new MemoryStream(fileBytes)))
+            using (var doc = new PdfDocument(reader))
+            {
+                var pageCount = doc.GetNumberOfPages();
+                Logger.LogInformation("PDF has {PageCount} pages", pageCount);
+
+                for (int i = 1; i <= pageCount; i++)
+                {
+                    try
+                    {
+                        var page = doc.GetPage(i);
+                        var text = PdfTextExtractor.GetTextFromPage(page);
+
+                        if (!string.IsNullOrWhiteSpace(text))
+                        {
+                            extractedText.AppendLine($"\n--- Page {i} ---\n");
+                            extractedText.AppendLine(text);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Failed to extract text from page {PageNumber}", i);
+                    }
+                }
+            }
+
+            var result = extractedText.ToString().Trim();
+            Logger.LogInformation("Extracted {CharCount} characters from PDF", result.Length);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "PDF text extraction failed");
+            return string.Empty;
         }
     }
 }
