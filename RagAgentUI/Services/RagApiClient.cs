@@ -37,6 +37,62 @@ public class RagApiClient
     }
 
     /// <summary>
+    /// Check if document with given title already exists
+    /// </summary>
+    public async Task<bool> DocumentExistsAsync(string title)
+    {
+        try
+        {
+            _logger.LogInformation("[RagApiClient] Checking if document exists: {Title}", title);
+
+            var response = await _httpClient.GetAsync($"/api/rag/check-document/{Uri.EscapeDataString(title)}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return false;
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(content);
+
+            return doc.RootElement.TryGetProperty("exists", out var existsProperty) && 
+                   existsProperty.GetBoolean();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[RagApiClient] Error checking document existence");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Delete a document by title
+    /// </summary>
+    public async Task<bool> DeleteDocumentAsync(string title)
+    {
+        try
+        {
+            _logger.LogInformation("[RagApiClient] Deleting document: {Title}", title);
+
+            var response = await _httpClient.DeleteAsync($"/api/rag/delete-document/{Uri.EscapeDataString(title)}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("[RagApiClient] Delete failed with status {Status}", response.StatusCode);
+                return false;
+            }
+
+            _logger.LogInformation("[RagApiClient] Document deleted successfully");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[RagApiClient] Error deleting document");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Ingest text content directly (e.g., from file uploads)
     /// Uses test endpoint for reliable storage (agents pipeline still unstable)
     /// </summary>

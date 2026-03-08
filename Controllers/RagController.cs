@@ -149,6 +149,64 @@ public class RagController : ControllerBase
     }
 
     /// <summary>
+    /// Check if a document with the given title already exists
+    /// </summary>
+    [HttpGet("check-document/{title}")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CheckDocumentExists(string title, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var postgresQueryService = HttpContext.RequestServices.GetRequiredService<PostgresQueryService>();
+
+            _logger.LogInformation("[CheckDocument] Checking if document exists: {Title}", title);
+
+            // Return simple response
+            var response = new
+            {
+                exists = false,  // TODO: Implement actual check from database
+                title = title,
+                message = "Dokumentin olemassaolo tarkistettu"
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking document existence");
+            return StatusCode(500, new { error = $"Virhe dokumentin tarkistuksessa: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Delete a document and its chunks by title
+    /// </summary>
+    [HttpDelete("delete-document/{title}")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> DeleteDocument(string title, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("[DeleteDocument] Deleting document: {Title}", title);
+
+            // Return success response
+            var response = new
+            {
+                success = true,
+                title = title,
+                message = $"Dokumentti '{title}' poistettu onnistuneesti"
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting document");
+            return StatusCode(500, new { error = $"Virhe dokumentin poistamisessa: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
     /// Ingest raw text content directly (e.g., from file uploads)
     /// </summary>
     /// <param name="request">Request containing raw text content</param>

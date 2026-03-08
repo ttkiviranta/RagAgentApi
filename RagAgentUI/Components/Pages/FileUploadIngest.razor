@@ -12,17 +12,17 @@
     <div class="max-w-2xl mx-auto">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
             <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                📄 Upload PDF Document
+                📄 Lataa PDF-dokumentti
             </h1>
             <p class="text-gray-600 dark:text-gray-400 mb-8">
-                Upload a PDF file to ingest into the knowledge base. The system will process it automatically.
+                Lataa PDF-tiedosto integroitavaksi tietopohjaan. Järjestelmä käsittelee sen automaattisesti.
             </p>
 
             <div class="space-y-6">
                 <!-- File Upload Input -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
-                        Select PDF File
+                        Valitse PDF-tiedosto
                     </label>
                     
                     <InputFile OnChange="OnFileSelected" accept=".pdf" 
@@ -33,36 +33,10 @@
                     {
                         <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                             <p class="text-sm font-medium text-blue-700 dark:text-blue-300">
-                                ✓ Selected: <span class="font-bold">@selectedFile.Name</span> (@FormatFileSize(selectedFile.Size))
+                                ✓ Valittu: <span class="font-bold">@selectedFile.Name</span> (@FormatFileSize(selectedFile.Size))
                             </p>
                         </div>
                     }
-                </div>
-
-                <!-- Chunk Settings -->
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Chunk Size
-                        </label>
-                        <input @bind="chunkSize" 
-                               type="number" 
-                               min="100" 
-                               max="5000"
-                               class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Chunk Overlap
-                        </label>
-                        <input @bind="chunkOverlap" 
-                               type="number" 
-                               min="0" 
-                               max="500"
-                               class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 
-                                      bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-                    </div>
                 </div>
 
                 <!-- Submit Button -->
@@ -71,9 +45,35 @@
                         class="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 
                                text-white rounded-lg font-medium transition-colors text-lg
                                disabled:cursor-not-allowed">
-                    @(isProcessing ? "Processing PDF..." : "🚀 Ingest PDF")
+                    @(isProcessing ? "Käsitellään PDF:ää..." : "🚀 Lataa PDF")
                 </button>
             </div>
+
+            <!-- Duplicate Document Modal -->
+            @if (showDuplicateDialog)
+            {
+                <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-md">
+                        <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                            ⚠️ Dokumentti on jo ladattu
+                        </h2>
+                        <p class="text-gray-600 dark:text-gray-400 mb-6">
+                            Dokumentti nimellä "<strong>@selectedFile?.Name</strong>" on jo olemassa. 
+                            Haluatko päivittää sen? Vanha versio poistetaan automaattisesti.
+                        </p>
+                        <div class="flex gap-3">
+                            <button @onclick="() => { showDuplicateDialog = false; isProcessing = false; }"
+                                    class="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-900 rounded-lg font-medium">
+                                Peruuta
+                            </button>
+                            <button @onclick="ProceedWithUpdate"
+                                    class="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium">
+                                Päivitä
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
 
             <!-- Progress -->
             @if (isProcessing)
@@ -88,49 +88,29 @@
                 </div>
             }
 
-            <!-- Results -->
+            <!-- Success Message -->
             @if (!string.IsNullOrEmpty(successMessage))
             {
                 <div class="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                     <div class="flex items-start gap-3">
                         <span class="text-green-500 text-2xl">✅</span>
                         <div>
-                            <p class="font-medium text-green-700 dark:text-green-300">
-                                Success!
-                            </p>
-                            <p class="text-sm text-green-600 dark:text-green-400 mt-2 whitespace-pre-wrap">
-                                @successMessage
-                            </p>
-                            <button @onclick="ResetForm"
-                                    class="mt-3 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">
-                                Upload Another File
-                            </button>
+                            <p class="font-medium text-green-700 dark:text-green-300">Onnistui!</p>
+                            <p class="text-sm text-green-600 dark:text-green-400 mt-2 whitespace-pre-wrap">@successMessage</p>
                         </div>
                     </div>
                 </div>
             }
 
+            <!-- Error Message -->
             @if (!string.IsNullOrEmpty(errorMessage))
             {
                 <div class="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                     <div class="flex items-start gap-3">
                         <span class="text-red-500 text-2xl">❌</span>
                         <div>
-                            <p class="font-medium text-red-700 dark:text-red-300">
-                                Error
-                            </p>
-                            <p class="text-sm text-red-600 dark:text-red-400 mt-1 whitespace-pre-wrap font-mono">
-                                @errorMessage
-                            </p>
-                            <div class="mt-3 p-2 bg-red-100 dark:bg-red-900/30 rounded text-xs text-red-700 dark:text-red-300">
-                                <p><strong>Troubleshooting:</strong></p>
-                                <ul class="mt-2 list-disc list-inside space-y-1">
-                                    <li>Ensure the API server is running on @GetApiUrl()</li>
-                                    <li>Check browser console (F12) for network errors</li>
-                                    <li>Verify appsettings has correct ApiSettings:BaseUrl</li>
-                                    <li>Check server logs for detailed error information</li>
-                                </ul>
-                            </div>
+                            <p class="font-medium text-red-700 dark:text-red-300">Virhe</p>
+                            <p class="text-sm text-red-600 dark:text-red-400 mt-2 whitespace-pre-wrap">@errorMessage</p>
                         </div>
                     </div>
                 </div>
@@ -142,28 +122,26 @@
 @code {
     private IBrowserFile selectedFile;
     private bool isProcessing = false;
+    private bool showDuplicateDialog = false;
     private string progressMessage = "";
     private string successMessage = "";
     private string errorMessage = "";
-    private int chunkSize = 1000;
-    private int chunkOverlap = 200;
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
         selectedFile = e.File;
         errorMessage = "";
         
-        // Validate file
-        if (selectedFile.Size > 50 * 1024 * 1024) // 50MB limit
+        if (selectedFile.Size > 50 * 1024 * 1024)
         {
-            errorMessage = "File is too large. Maximum size is 50MB.";
+            errorMessage = "Tiedosto on liian suuri. Maksimikoko on 50 MB.";
             selectedFile = null;
             return;
         }
         
         if (!selectedFile.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase))
         {
-            errorMessage = "Please select a PDF file.";
+            errorMessage = "Valitse PDF-tiedosto.";
             selectedFile = null;
             return;
         }
@@ -173,19 +151,66 @@
     {
         if (selectedFile == null)
         {
-            errorMessage = "Please select a PDF file first.";
+            errorMessage = "Valitse ensin PDF-tiedosto.";
             return;
         }
 
         isProcessing = true;
-        progressMessage = "Reading file...";
+        progressMessage = "Tarkistetaan dokumenttia...";
+        errorMessage = "";
+
+        try
+        {
+            // Check if document already exists
+            bool exists = await ApiClient.DocumentExistsAsync(selectedFile.Name);
+            
+            if (exists)
+            {
+                showDuplicateDialog = true;
+                isProcessing = false;
+                return;
+            }
+            
+            await ProcessFileIngestion();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Virhe dokumentin tarkistuksessa");
+            errorMessage = $"Virhe: {ex.Message}";
+            isProcessing = false;
+        }
+    }
+
+    private async Task ProceedWithUpdate()
+    {
+        showDuplicateDialog = false;
+        isProcessing = true;
+        progressMessage = "Poistetaan vanhaa dokumenttia...";
+
+        try
+        {
+            bool deleteSuccess = await ApiClient.DeleteDocumentAsync(selectedFile.Name);
+            progressMessage = "Ladataan uutta dokumenttia...";
+            await ProcessFileIngestion();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Virhe dokumentin päivityksessä");
+            errorMessage = $"Virhe: {ex.Message}";
+            isProcessing = false;
+            showDuplicateDialog = false;
+        }
+    }
+
+    private async Task ProcessFileIngestion()
+    {
+        progressMessage = "Luetaan tiedostoa...";
         errorMessage = "";
         successMessage = "";
 
         try
         {
-            // Read file as bytes
-            var maxFileSize = 50 * 1024 * 1024; // 50MB
+            var maxFileSize = 50 * 1024 * 1024;
             byte[] fileBytes;
 
             using (var stream = selectedFile.OpenReadStream(maxFileSize))
@@ -195,77 +220,42 @@
                 fileBytes = ms.ToArray();
             }
 
-            progressMessage = "Creating document content...";
+            progressMessage = "Poistetaan tekstiä PDF:stä...";
+            var pdfText = ExtractPdfText(fileBytes);
+            
+            if (string.IsNullOrWhiteSpace(pdfText))
+            {
+                pdfText = CreateDocumentContent(selectedFile.Name, fileBytes);
+            }
 
-            // Create a descriptive document content
-            var documentContent = CreateDocumentContent(selectedFile.Name, fileBytes);
-
-            Logger.LogInformation("Ingesting PDF file: {FileName}, Size: {Size} bytes", 
-                selectedFile.Name, fileBytes.Length);
-
-            progressMessage = "Processing with RAG agents...";
-
-            // Call ingest endpoint with text content
-            var response = await ApiClient.IngestTextAsync(
-                documentContent, 
-                title: selectedFile.Name,
-                source: "pdf-upload"
-            );
+            Logger.LogInformation("Ingesting PDF: {FileName}, Size: {Size}", selectedFile.Name, fileBytes.Length);
+            progressMessage = "Käsitellään agentilla...";
+            
+            var response = await ApiClient.IngestTextAsync(pdfText, title: selectedFile.Name, source: "pdf-upload");
 
             if (response != null && response.ThreadId != Guid.Empty)
             {
-                successMessage = $@"Document ingested successfully! ✅
+                successMessage = $@"Dokumentti ladattu onnistuneesti! ✅
 
-📄 File Information
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• File Name: {selectedFile.Name}
-• File Size: {FormatFileSize(fileBytes.Length)}
-• Upload Status: ✅ Complete
+📄 Tiedostojen tiedot
+━━━━━━━━━━━━━━━━━━━━
+• Nimi: {selectedFile.Name}
+• Koko: {FormatFileSize(fileBytes.Length)}
+• Tila: ✅ Valmis
 
-📊 Processing Results
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Thread ID: {response.ThreadId}
-• Message: {response.Message}
-• Status: {response.Status}
-
-🚀 Next Steps
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Go to Chat page to ask questions
-2. Try queries related to your document
-3. The system will find relevant passages
-
-💡 Tip: To extract actual PDF text content, integrate a PDF library
-(PdfSharpCore, iTextSharp, or PDFTextReader)";
+🚀 Seuraavat vaiheet
+1. Siirry Chat-sivulle
+2. Kysy kysymyksiä dokumentista";
             }
             else
             {
-                errorMessage = "Failed to ingest document. The backend returned an unexpected response.";
+                errorMessage = "Dokumentin lataus epäonnistui.";
             }
-        }
-        catch (HttpRequestException ex)
-        {
-            Logger.LogError(ex, "HTTP error during file ingestion");
-            errorMessage = $@"HTTP Error: {ex.Message}
-
-This typically means:
-• The API server is not running
-• The connection was refused
-• Network is unreachable
-
-Solution:
-1. Start backend: cd RagAgentApi && dotnet run
-2. Wait for startup message
-3. Try uploading again";
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error ingesting PDF file");
-            errorMessage = $@"Error: {ex.Message}
-
-Please verify:
-• File is valid and readable
-• File is not larger than 50MB
-• System has sufficient disk space";
+            Logger.LogError(ex, "Virhe tiedoston latauksen aikana");
+            errorMessage = $"Virhe: {ex.Message}";
         }
         finally
         {
@@ -274,78 +264,55 @@ Please verify:
         }
     }
 
+    private string ExtractPdfText(byte[] fileBytes)
+    {
+        try
+        {
+            var extractedText = new StringBuilder();
+            
+            using (var reader = new PdfReader(new MemoryStream(fileBytes)))
+            using (var doc = new PdfDocument(reader))
+            {
+                var pageCount = doc.GetNumberOfPages();
+                
+                for (int i = 1; i <= pageCount; i++)
+                {
+                    try
+                    {
+                        var page = doc.GetPage(i);
+                        var text = PdfTextExtractor.GetTextFromPage(page);
+                        
+                        if (!string.IsNullOrWhiteSpace(text))
+                        {
+                            extractedText.AppendLine($"\n--- Sivu {i} ---\n");
+                            extractedText.AppendLine(text);
+                        }
+                    }
+                    catch { }
+                }
+            }
+            
+            return extractedText.ToString().Trim();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "PDF-tekstin poisto epäonnistui");
+            return string.Empty;
+        }
+    }
+
     private string CreateDocumentContent(string fileName, byte[] fileBytes)
     {
         var fileSizeKb = fileBytes.Length / 1024.0;
-        var fileExtension = Path.GetExtension(fileName).ToLowerInvariant();
+        return $@"# Dokumentti: {fileName}
 
-        var content = $@"# Document Upload: {fileName}
+## Metatieto
+- Nimi: {fileName}
+- Koko: {fileSizeKb:F2} KB
+- Latausaika: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+- Tyyppi: PDF
 
-## Metadata
-- **File Name**: {fileName}
-- **File Size**: {fileSizeKb:F2} KB ({fileBytes.Length} bytes)
-- **File Type**: {fileExtension}
-- **Upload Date**: {DateTime.Now:yyyy-MM-dd HH:mm:ss UTC}
-- **Upload Method**: Blazor File Upload Component
-
-## Summary
-This document was uploaded through the application's file upload interface.
-
-### File Information
-- Full file name: {fileName}
-- Total size: {fileBytes.Length} bytes
-- Type indicator: {fileExtension}
-
-### Content Processing Status
-✅ Document received and validated
-✅ Prepared for ingestion
-⏳ Raw text extraction ready
-⏳ Full PDF text extraction requires PDF library
-
-### How to Enable Full Text Extraction
-To enable automatic PDF text extraction:
-
-1. Install a PDF processing library:
-   ```
-   Install-Package PdfSharpCore
-   Install-Package itext7
-   Install-Package PDFTextReader
-   ```
-
-2. Implement text extraction in FileUploadIngest.razor:
-   ```csharp
-   using iText.Kernel.Pdf;
-   using iText.Kernel.Pdf.Canvas.Parser;
-
-   var pdfReader = new PdfReader(fileBytes);
-   var document = new PdfDocument(pdfReader);
-   // Extract text from pages
-   ```
-
-3. Send extracted text to backend
-
-### Current Capabilities
-This document metadata and information has been ingested into the knowledge base.
-You can now:
-- Ask questions about document metadata
-- Search for related information
-- Reference this document in queries
-
----
-
-*Document ingested at {DateTime.Now:yyyy-MM-dd HH:mm:ss}*
-*Upload Source: PDF File Upload Interface*";
-
-        return content;
-    }
-
-    private void ResetForm()
-    {
-        selectedFile = null;
-        successMessage = "";
-        errorMessage = "";
-        chunkSize = 1000;
-        chunkOverlap = 200;
+Dokumentti ladattu Blazor-komponentin kautta.";
     }
 
     private string FormatFileSize(long bytes)
@@ -361,64 +328,5 @@ You can now:
         }
 
         return $"{size:F2} {units[unitIndex]}";
-    }
-
-    private string GetApiUrl()
-    {
-        try
-        {
-            var baseAddress = ApiClient.GetType()
-                .GetProperty("_httpClient", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                ?.GetValue(ApiClient) as HttpClient;
-            return baseAddress?.BaseAddress?.ToString() ?? "http://localhost:5000";
-        }
-        catch
-        {
-            return "http://localhost:5000";
-        }
-    }
-
-    private string ExtractPdfText(byte[] fileBytes)
-    {
-        try
-        {
-            var extractedText = new StringBuilder();
-
-            using (var reader = new PdfReader(new MemoryStream(fileBytes)))
-            using (var doc = new PdfDocument(reader))
-            {
-                var pageCount = doc.GetNumberOfPages();
-                Logger.LogInformation("PDF has {PageCount} pages", pageCount);
-
-                for (int i = 1; i <= pageCount; i++)
-                {
-                    try
-                    {
-                        var page = doc.GetPage(i);
-                        var text = PdfTextExtractor.GetTextFromPage(page);
-
-                        if (!string.IsNullOrWhiteSpace(text))
-                        {
-                            extractedText.AppendLine($"\n--- Page {i} ---\n");
-                            extractedText.AppendLine(text);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogWarning(ex, "Failed to extract text from page {PageNumber}", i);
-                    }
-                }
-            }
-
-            var result = extractedText.ToString().Trim();
-            Logger.LogInformation("Extracted {CharCount} characters from PDF", result.Length);
-
-            return result;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "PDF text extraction failed");
-            return string.Empty;
-        }
     }
 }
