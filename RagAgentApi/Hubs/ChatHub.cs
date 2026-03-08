@@ -107,26 +107,28 @@ public class ChatHub : Hub
                 else
                 {
                     // Hybrid mode: Use general ChatGPT knowledge with disclaimer
-                    var disclaimerPrefix = "📄 **Dokumenteista ei löytynyt tietoa.** Vastaan yleisen tietämykseni perusteella:\n\n";
-                    
+                    var disclaimerPrefix = "[No documents found] Answering based on general knowledge:\n\n";
+
                     // Send disclaimer first
                     await Clients.Caller.SendAsync("ReceiveChunk", disclaimerPrefix);
-                    await Task.Delay(100);
-                    
+                    await Task.Delay(10);
+
                     // Use ChatGPT without context
                     var systemPrompt = @"You are a helpful AI assistant. Answer the user's question based on your general knowledge.
 Be concise, accurate, and helpful. If you're not certain about something, say so.";
-                    
+
                     fullAnswer = disclaimerPrefix;
+                    int chunkCount = 0;
                     await foreach (var chunk in _openAI.GetChatCompletionStreamAsync(query, ""))
                     {
                         fullAnswer += chunk;
+                        chunkCount++;
                         await Clients.Caller.SendAsync("ReceiveChunk", chunk);
+                        await Task.Delay(1);
                     }
-                    
-                    _logger.LogInformation("[ChatHub] Generated answer using general knowledge (no context)");
+                    _logger.LogInformation("[ChatHub] Generated {ChunkCount} chunks with general knowledge", chunkCount);
                 }
-                
+
                 sources = new List<SourceDto>();
             }
             else
@@ -149,9 +151,10 @@ Be concise, accurate, and helpful. If you're not certain about something, say so
                 await Clients.Caller.SendAsync("ReceiveSources", sourcesJson);
 
                 // Add prefix to indicate document-based answer
-                var prefix = "📄 **Vastaus dokumenttien perusteella:**\n\n";
+                var prefix = "[Answer from documents]\n\n";
                 _logger.LogInformation("[ChatHub] Sending ReceiveChunk (prefix): {Length} chars", prefix.Length);
                 await Clients.Caller.SendAsync("ReceiveChunk", prefix);
+                await Task.Delay(10); // Small delay to ensure delivery
                 fullAnswer = prefix;
 
                 // Stream answer from Azure OpenAI with context
@@ -160,8 +163,12 @@ Be concise, accurate, and helpful. If you're not certain about something, say so
                 {
                     fullAnswer += chunk;
                     chunkCount++;
-                    _logger.LogDebug("[ChatHub] Sending ReceiveChunk #{ChunkNum}: {Length} chars", chunkCount, chunk.Length);
+                    if (chunkCount % 5 == 0) // Log every 5 chunks
+                    {
+                        _logger.LogDebug("[ChatHub] Sending ReceiveChunk #{ChunkNum}: {Length} chars", chunkCount, chunk.Length);
+                    }
                     await Clients.Caller.SendAsync("ReceiveChunk", chunk);
+                    await Task.Delay(1); // Small delay between chunks
                 }
                 _logger.LogInformation("[ChatHub] Sent {ChunkCount} chunks total", chunkCount);
 
