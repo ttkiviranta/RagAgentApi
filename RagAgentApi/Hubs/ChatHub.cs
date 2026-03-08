@@ -137,7 +137,7 @@ Be concise, accurate, and helpful. If you're not certain about something, say so
                 sources = searchResults.Select(r => new SourceDto(
                     Url: r.SourceUrl ?? "",
                     Content: r.Content.Length > 200 ? r.Content.Substring(0, 200) + "..." : r.Content,
-                    RelevanceScore: r.Score ?? 0
+                    RelevanceScore: r.RelevanceScore  // ← Fixed: RelevanceScore not Score
                 )).ToList();
                 
                 // Send sources in real-time
