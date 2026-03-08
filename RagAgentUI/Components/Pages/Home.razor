@@ -173,21 +173,12 @@
     {
         try
         {
-            await JS.InvokeVoidAsync("debugLog.log", "[Home] Connecting to ChatHub...");
+            // Connect to ChatHub (no JS interop here)
             await ChatHub.ConnectAsync();
-            await JS.InvokeVoidAsync("debugLog.log", $"[Home] ChatHub connected: {ChatHub.IsConnected}");
-
-            // Wait a moment to ensure connection is established
-            if (!ChatHub.IsConnected)
-            {
-                await Task.Delay(500);
-                await JS.InvokeVoidAsync("debugLog.log", "[Home] ChatHub still not connected after delay");
-            }
 
             // Handle incoming message chunks
             ChatHub.OnMessageChunkReceived += async (chunk) =>
             {
-                await JS.InvokeVoidAsync("debugLog.log", $"[Home] Received chunk: {chunk.Length} chars");
                 streamingMessage += chunk;
                 await InvokeAsync(StateHasChanged);
                 await ScrollToBottom();
@@ -196,11 +187,9 @@
             // ← NEW: Handle incoming sources
             ChatHub.OnSourcesReceived += async (sourcesJson) =>
             {
-                await JS.InvokeVoidAsync("debugLog.log", $"[Home] Received sources: {sourcesJson.Length} chars");
                 try
                 {
                     currentSources = System.Text.Json.JsonSerializer.Deserialize<List<SourceDto>>(sourcesJson) ?? new();
-                    await JS.InvokeVoidAsync("debugLog.log", $"[Home] Deserialized {currentSources.Count} sources");
                     await InvokeAsync(StateHasChanged);
                 }
                 catch (Exception ex)
@@ -267,8 +256,30 @@
         }
         catch (Exception ex)
         {
-            await JS.InvokeVoidAsync("debugLog.error", $"[Home] Exception in OnInitializedAsync: {ex.Message}");
             errorMessage = $"Initialization error: {ex.Message}";
+        }
+    }
+
+    // ← MOVE JS INTEROP TO HERE
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("debugLog.log", "[Home] Connecting to ChatHub...");
+                await JS.InvokeVoidAsync("debugLog.log", $"[Home] ChatHub connected: {ChatHub.IsConnected}");
+
+                if (!ChatHub.IsConnected)
+                {
+                    await Task.Delay(500);
+                    await JS.InvokeVoidAsync("debugLog.log", "[Home] ChatHub still not connected after delay");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Home] JS Interop error: {ex.Message}");
+            }
         }
     }
 
