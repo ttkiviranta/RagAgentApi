@@ -8,6 +8,11 @@
 @inject ChatHubService ChatHub
 @implements IAsyncDisposable
 
+<!-- DEBUG: Show that component is loaded -->
+<div style="position: fixed; top: 0; right: 0; background: red; color: white; padding: 10px; z-index: 9999; font-size: 12px;">
+    🔴 Home.razor loaded | Connected: @ChatHub.IsConnected
+</div>
+
 <div class="flex h-screen bg-white dark:bg-gray-900">
     <!-- Sidebar -->
     <ConversationList Conversations="@conversations"
