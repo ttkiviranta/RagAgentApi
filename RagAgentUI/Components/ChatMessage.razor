@@ -9,7 +9,7 @@
      @(IsUser ? "You" : "🤖 Assistant")
             </span>
       <span class="text-xs opacity-60">
- @CreatedAt.ToString("HH:mm")
+ @GetLocalTime()
          </span>
         </div>
 
@@ -51,8 +51,18 @@
 </div>
 
 @code {
-[Parameter] public bool IsUser { get; set; }
+    [Parameter] public bool IsUser { get; set; }
     [Parameter] public string Content { get; set; } = string.Empty;
     [Parameter] public DateTime CreatedAt { get; set; }
     [Parameter] public List<SourceDto>? Sources { get; set; }
+
+    private string GetLocalTime()
+    {
+        // Convert UTC time from database to local time
+        var localTime = CreatedAt.Kind == DateTimeKind.Utc 
+            ? CreatedAt.ToLocalTime() 
+            : CreatedAt;
+
+        return localTime.ToString("HH:mm");
+    }
 }

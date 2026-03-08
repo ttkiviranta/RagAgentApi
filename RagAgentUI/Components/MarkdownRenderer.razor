@@ -1,7 +1,16 @@
 @using Markdig
 @implements IAsyncDisposable
 
-@((MarkupString)renderedHtml)
+<div class="markdown-content">
+    @if (!string.IsNullOrEmpty(renderedHtml))
+    {
+        @((MarkupString)renderedHtml)
+    }
+    else if (!string.IsNullOrWhiteSpace(MarkdownContent))
+    {
+        <p>Rendering...</p>
+    }
+</div>
 
 @code {
     [Parameter]
@@ -9,23 +18,34 @@
 
     private string renderedHtml = string.Empty;
 
-    protected override async Task OnParametersSetAsync()
+    protected override void OnParametersSet()
     {
-        await Task.Run(() =>
+        RenderMarkdown();
+    }
+
+    private void RenderMarkdown()
+    {
+        try
         {
             if (!string.IsNullOrWhiteSpace(MarkdownContent))
             {
                 var pipeline = new MarkdownPipelineBuilder()
                     .UseAdvancedExtensions()
                     .Build();
-                
+
                 renderedHtml = Markdown.ToHtml(MarkdownContent, pipeline);
+                Console.WriteLine($"[MarkdownRenderer] Rendered {MarkdownContent.Length} chars to {renderedHtml.Length} chars HTML");
             }
             else
             {
                 renderedHtml = string.Empty;
             }
-        });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MarkdownRenderer] Error: {ex.Message}");
+            renderedHtml = $"<p style='color:red;'>Error rendering markdown: {ex.Message}</p>";
+        }
     }
 
     async ValueTask IAsyncDisposable.DisposeAsync()
