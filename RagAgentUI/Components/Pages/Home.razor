@@ -173,8 +173,7 @@
     {
         try
         {
-            // Connect to ChatHub (no JS interop here)
-            await ChatHub.ConnectAsync();
+            // ← ATTACH HANDLERS FIRST (before connecting!)
 
             // Handle incoming message chunks
             ChatHub.OnMessageChunkReceived += async (chunk) =>
@@ -184,7 +183,7 @@
                 await ScrollToBottom();
             };
 
-            // ← NEW: Handle incoming sources
+            // ← Handle incoming sources
             ChatHub.OnSourcesReceived += async (sourcesJson) =>
             {
                 try
@@ -246,6 +245,9 @@
                 isStreaming = false;
                 await InvokeAsync(StateHasChanged);
             };
+
+            // ← NOW connect (after handlers are attached!)
+            await ChatHub.ConnectAsync();
 
             await LoadConversations();
 
