@@ -220,8 +220,10 @@
 
             // Reload conversations list to update message count
             await LoadConversations();
-            
+
+            // ← IMPORTANT: StateHasChanged + scroll
             await InvokeAsync(StateHasChanged);
+            await ScrollToBottom();
         };
 
         ChatHub.OnError += async (error) =>
