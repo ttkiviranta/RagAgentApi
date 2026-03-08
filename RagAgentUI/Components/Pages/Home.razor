@@ -194,10 +194,12 @@
                 try
                 {
                     currentSources = System.Text.Json.JsonSerializer.Deserialize<List<SourceDto>>(sourcesJson) ?? new();
+                    Console.WriteLine($"[Home] Deserialized {currentSources.Count} sources successfully");
                     await InvokeAsync(StateHasChanged);
                 }
                 catch (Exception ex)
                 {
+                    Console.WriteLine($"[Home] Exception deserializing sources: {ex.Message}\n{ex.StackTrace}");
                     await JS.InvokeVoidAsync("debugLog.error", $"[Home] Error deserializing sources: {ex.Message}");
                 }
             };
