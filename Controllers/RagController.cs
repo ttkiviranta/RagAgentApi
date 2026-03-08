@@ -174,18 +174,21 @@ public class RagController : ControllerBase
             _logger.LogInformation("Starting text content ingestion: {Title}", request.Title ?? "Untitled");
 
             var threadId = Guid.NewGuid();
+            var documentUrl = $"local://document/{request.Title}";
 
             try
             {
-                // Step 1: Create chunks from raw text (bypass scraping)
+                // NOTE: Duplicate documents will be created with same title
+                // TODO: Add duplicate detection to avoid creating duplicate documents
+                _logger.LogInformation("[IngestText] Processing document: {Title} (URL: {Url})", request.Title, documentUrl);
                 var chunkerAgent = HttpContext.RequestServices.GetRequiredService<ChunkerAgent>();
                 var chunkContext = new AgentContext
                 {
                     ThreadId = threadId.ToString(),
                     State = new Dictionary<string, object>
                     {
-                        { "raw_content", request.Content },  // ? FIX: Use "raw_content" key
-                        { "url", $"local://document/{request.Title}" },  // ? FIX: Add URL for storage
+                        { "raw_content", request.Content },
+                        { "url", documentUrl },  // Use variable for consistency
                         { "chunk_size", request.ChunkSize },
                         { "chunk_overlap", request.ChunkOverlap },
                         { "title", request.Title ?? "Uploaded Document" },
