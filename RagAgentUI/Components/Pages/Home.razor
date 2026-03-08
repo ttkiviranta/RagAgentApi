@@ -154,6 +154,7 @@
     private string queryInput = string.Empty;
     private bool isStreaming = false;
     private string streamingMessage = string.Empty;
+    private List<SourceDto>? currentSources = new();  // ← NEW: Store sources
     private ElementReference messageContainer;
     private string errorMessage = string.Empty;
 
@@ -165,6 +166,7 @@
     {
         await ChatHub.ConnectAsync();
 
+        // Handle incoming message chunks
         ChatHub.OnMessageChunkReceived += async (chunk) =>
         {
             streamingMessage += chunk;
@@ -172,10 +174,24 @@
             await ScrollToBottom();
         };
 
+        // ← NEW: Handle incoming sources
+        ChatHub.OnSourcesReceived += async (sourcesJson) =>
+        {
+            try
+            {
+                currentSources = System.Text.Json.JsonSerializer.Deserialize<List<SourceDto>>(sourcesJson) ?? new();
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error deserializing sources: {ex.Message}");
+            }
+        };
+
         ChatHub.OnMessageComplete += async () =>
         {
             isStreaming = false;
-            
+
             // Add the completed streaming message to messages list
             if (!string.IsNullOrEmpty(streamingMessage) && currentConversationId.HasValue)
             {
@@ -185,16 +201,23 @@
                     .Where(m => m.Role == "assistant")
                     .OrderByDescending(m => m.CreatedAt)
                     .FirstOrDefault();
-                
+
                 if (latestAssistantMessage != null && 
                     !messages!.Any(m => m.Id == latestAssistantMessage.Id))
                 {
+                    // Use currentSources if available
+                    if (currentSources?.Any() == true)
+                    {
+                        latestAssistantMessage = latestAssistantMessage with { Sources = currentSources };
+                    }
+
                     messages!.Add(latestAssistantMessage);
                 }
             }
-            
+
             streamingMessage = string.Empty;
-            
+            currentSources = new();  // ← Reset sources for next message
+
             // Reload conversations list to update message count
             await LoadConversations();
             
