@@ -9,7 +9,9 @@
     <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <ErrorBoundaryHandler>
+        <Routes @rendermode="InteractiveServer" />
+    </ErrorBoundaryHandler>
     <script src="_framework/blazor.web.js"></script>
     <script src="js/debug.js"></script>
 </body>

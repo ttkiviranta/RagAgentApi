@@ -107,16 +107,16 @@ public class ChatHub : Hub
                 else
                 {
                     // Hybrid mode: Use general ChatGPT knowledge with disclaimer
+                    _logger.LogInformation("[ChatHub] HYBRID MODE: No documents found, using general knowledge for query: '{Query}'", query);
+
                     var disclaimerPrefix = "[No documents found] Answering based on general knowledge:\n\n";
 
                     // Send disclaimer first
+                    _logger.LogInformation("[ChatHub] Sending disclaimer prefix: {Prefix}", disclaimerPrefix);
                     await Clients.Caller.SendAsync("ReceiveChunk", disclaimerPrefix);
                     await Task.Delay(10);
 
-                    // Use ChatGPT without context
-                    var systemPrompt = @"You are a helpful AI assistant. Answer the user's question based on your general knowledge.
-Be concise, accurate, and helpful. If you're not certain about something, say so.";
-
+                    // Use ChatGPT without context (empty string = no RAG context)
                     fullAnswer = disclaimerPrefix;
                     int chunkCount = 0;
                     await foreach (var chunk in _openAI.GetChatCompletionStreamAsync(query, ""))
@@ -126,7 +126,7 @@ Be concise, accurate, and helpful. If you're not certain about something, say so
                         await Clients.Caller.SendAsync("ReceiveChunk", chunk);
                         await Task.Delay(1);
                     }
-                    _logger.LogInformation("[ChatHub] Generated {ChunkCount} chunks with general knowledge", chunkCount);
+                    _logger.LogInformation("[ChatHub] HYBRID MODE completed: Generated {ChunkCount} chunks with general knowledge", chunkCount);
                 }
 
                 sources = new List<SourceDto>();

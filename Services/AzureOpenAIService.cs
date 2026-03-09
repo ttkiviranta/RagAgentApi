@@ -141,20 +141,23 @@ IMPORTANT: Always respond in the same language as the user's question.";
         }
         else
         {
-            // Context available - strict RAG mode
-            systemPrompt = $@"You are a helpful AI assistant that answers questions based ONLY on the provided context.
+            // Context available - HYBRID mode: prefer documents, fallback to general knowledge
+            systemPrompt = $@"You are a helpful AI assistant. You have access to some context documents below.
 
-IMPORTANT RULES:
-- Answer ONLY using information from the context below
-- If the context doesn't contain the answer, clearly state that you don't have that information
-- Do NOT use your general knowledge to answer questions
-- Be concise and cite specific parts of the context when relevant
-- Always respond in the same language as the user's question
+INSTRUCTIONS:
+1. First, check if the provided context contains information relevant to the user's question
+2. If the context DOES contain relevant information: Answer based on the context and cite it
+3. If the context does NOT contain relevant information: 
+   - Start your answer with: ""[General knowledge] ""
+   - Then answer based on your general knowledge
+   - Be helpful and provide accurate information
+4. Always respond in the same language as the user's question
+5. Be concise and helpful
 
-Context:
+Context (may or may not be relevant):
 {context}
 
-Based solely on the context above, please answer the user's question.";
+Now answer the user's question. If the context is not relevant, use your general knowledge with the [General knowledge] prefix.";
         }
 
         var chatCompletionsOptions = new ChatCompletionsOptions()

@@ -5,7 +5,7 @@
     <div class="@(IsUser ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white") 
          max-w-[75%] rounded-2xl px-4 py-3 shadow-sm">
 
-        <div class="flex items-center gap-2 mb-1">
+        <div class="flex items-center gap-2 mb-1 flex-wrap">
             <span class="text-xs font-semibold opacity-90">
                 @if (IsUser)
                 {
@@ -16,11 +16,20 @@
                     <text>🤖 Assistant</text>
                 }
             </span>
-            @if (!IsUser && Sources?.Any() == true)
+            @if (!IsUser)
             {
-                <span class="text-[10px] bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
-                    📄 From documents
-                </span>
+                @if (IsFromDocuments)
+                {
+                    <span class="text-[10px] bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
+                        📄 From documents
+                    </span>
+                }
+                else if (IsGeneralKnowledgeResponse)
+                {
+                    <span class="text-[10px] bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 px-2 py-0.5 rounded-full">
+                        🌐 General knowledge
+                    </span>
+                }
             }
             <span class="text-xs opacity-60">
                 @GetLocalTime()
@@ -40,11 +49,11 @@
             <div class="prose prose-sm max-w-none 
                 prose-headings:font-bold prose-h2:text-base prose-h3:text-sm
                 prose-p:my-2 prose-li:my-1 prose-code:bg-opacity-20 prose-code:px-2 prose-code:py-1 prose-code:rounded">
-                <MarkdownRenderer MarkdownContent="@Content" />
+                <MarkdownRenderer MarkdownContent="@DisplayContent" />
             </div>
         }
 
-        @if (Sources?.Any() == true)
+        @if (Sources?.Any() == true && IsFromDocuments)
         {
             <div class="mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
                 <p class="text-xs font-medium mb-2">📚 Sources:</p>
@@ -69,6 +78,54 @@
     [Parameter] public string Content { get; set; } = string.Empty;
     [Parameter] public DateTime CreatedAt { get; set; }
     [Parameter] public List<SourceDto>? Sources { get; set; }
+
+    // Detect if response is from general knowledge (LLM decided context wasn't relevant)
+    private bool IsGeneralKnowledgeResponse => 
+        !IsUser && 
+        !string.IsNullOrEmpty(Content) &&
+        (Content.Contains("[General knowledge]") ||
+         Content.Contains("[No documents found]") || 
+         Content.StartsWith("Yleistiedolla") ||
+         Content.Contains("yleistietoni perusteella"));
+
+    // Check if response is from documents (has sources AND doesn't indicate general knowledge)
+    private bool IsFromDocuments => 
+        !IsUser && 
+        Sources?.Any() == true && 
+        !IsGeneralKnowledgeResponse;
+
+    // Clean content by removing indicator prefixes
+    private string DisplayContent
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Content)) return Content;
+
+            var cleaned = Content;
+
+            // Remove [General knowledge] prefix
+            if (cleaned.StartsWith("[General knowledge]"))
+            {
+                cleaned = cleaned.Substring("[General knowledge]".Length).TrimStart();
+            }
+
+            // Remove [No documents found] prefix and disclaimer
+            if (cleaned.StartsWith("[No documents found]"))
+            {
+                var lines = cleaned.Split('\n', 2);
+                if (lines.Length > 1)
+                {
+                    cleaned = lines[1].TrimStart();
+                }
+                else
+                {
+                    cleaned = cleaned.Substring("[No documents found]".Length).TrimStart();
+                }
+            }
+
+            return cleaned;
+        }
+    }
 
     private string GetLocalTime()
     {

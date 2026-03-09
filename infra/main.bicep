@@ -37,6 +37,9 @@ param storageSku string = 'Standard_LRS'
 @description('Document Intelligence SKU')
 param docIntelligenceSku string = 'S0'
 
+@description('Email address for error alerts (leave empty to disable)')
+param alertEmailAddress string = ''
+
 // Variables
 var resourceSuffix = '${baseName}-${environment}'
 var resourceSuffixClean = replace(resourceSuffix, '-', '')
@@ -86,6 +89,8 @@ module insights 'modules/insights.bicep' = {
     logAnalyticsName: 'log-${resourceSuffix}'
     location: location
     tags: tags
+    alertEmailAddress: alertEmailAddress
+    enableAlerts: !empty(alertEmailAddress)
   }
 }
 
