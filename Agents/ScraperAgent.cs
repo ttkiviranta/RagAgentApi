@@ -19,28 +19,76 @@ public class ScraperAgent : BaseRagAgent
  public override string Name => "ScraperAgent";
 
     public override async Task<AgentResult> ExecuteAsync(AgentContext context, CancellationToken cancellationToken = default)
- {
+    {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-  LogExecutionStart(context.ThreadId);
+        LogExecutionStart(context.ThreadId);
 
-    try
+        try
         {
-        if (!context.State.TryGetValue("url", out var urlObj) || urlObj is not string url)
-      {
-      return AgentResult.CreateFailure("URL not found in context state");
-   }
+            if (!context.State.TryGetValue("url", out var urlObj) || urlObj is not string url)
+            {
+                return AgentResult.CreateFailure("URL not found in context state");
+            }
 
-     if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
-   {
-        return AgentResult.CreateFailure($"Invalid URL format: {url}");
-       }
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                return AgentResult.CreateFailure($"Invalid URL format: {url}");
+            }
 
-_logger.LogInformation("[ScraperAgent] Scraping content from {Url}", url);
+            // Get crawl parameters from context
+            var crawlDepth = context.State.TryGetValue("crawl_depth", out var depthObj) && depthObj is int depth ? depth : 0;
+            var maxPages = context.State.TryGetValue("max_pages", out var maxObj) && maxObj is int max ? max : 10;
+            var sameDomainOnly = !context.State.TryGetValue("same_domain_only", out var sameObj) || sameObj is not bool same || same;
 
-   // Set User-Agent to avoid blocking
-   _httpClient.DefaultRequestHeaders.Clear();
-    _httpClient.DefaultRequestHeaders.Add("User-Agent", 
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+            _logger.LogInformation("[ScraperAgent] Scraping content from {Url}, Depth: {Depth}, MaxPages: {MaxPages}", url, crawlDepth, maxPages);
+
+            // Use depth-aware scraping if crawl depth > 0
+            if (crawlDepth > 0)
+            {
+                var scrapedPages = await ScrapeWithDepthAsync(url, crawlDepth, maxPages, sameDomainOnly, cancellationToken);
+
+                if (!scrapedPages.Any())
+                {
+                    return AgentResult.CreateFailure($"No content found from {url} or linked pages");
+                }
+
+                // Combine all scraped content
+                var combinedContent = string.Join("\n\n---PAGE BREAK---\n\n", 
+                    scrapedPages.Select(p => $"# {p.Title}\nSource: {p.Url}\n\n{p.Content}"));
+
+                context.State["raw_content"] = combinedContent;
+                context.State["source_url"] = url;
+                context.State["pages_scraped"] = scrapedPages.Count;
+                context.State["scraped_urls"] = scrapedPages.Select(p => p.Url).ToList();
+
+                stopwatch.Stop();
+                LogExecutionComplete(context.ThreadId, true, stopwatch.Elapsed);
+
+                _logger.LogInformation("[ScraperAgent] Scraped {PageCount} pages, {Length} total chars from {Url}", 
+                    scrapedPages.Count, combinedContent.Length, url);
+
+                AddMessage(context, "ChunkerAgent", $"Content scraped successfully ({scrapedPages.Count} pages, {combinedContent.Length} characters)", 
+                    new Dictionary<string, object>
+                    {
+                        { "content_length", combinedContent.Length },
+                        { "source_url", url },
+                        { "pages_scraped", scrapedPages.Count }
+                    });
+
+                return AgentResult.CreateSuccess(
+                    $"Content scraped successfully from {scrapedPages.Count} pages",
+                    new Dictionary<string, object>
+                    {
+                        { "content_length", combinedContent.Length },
+                        { "source_url", url },
+                        { "pages_scraped", scrapedPages.Count }
+                    });
+            }
+
+            // Single page scraping (original logic)
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("User-Agent", 
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
 
      // Download HTML content
        var html = await _httpClient.GetStringAsync(uri, cancellationToken);
@@ -246,8 +294,192 @@ return blockElements.Contains(tagName);
 
  private bool IsNavigationText(string text)
     {
-    var navIndicators = new[] { "menu", "nav", "click", "home", "contact", "about", "login", "register", "search", "©", "cookie" };
-        return text.Length < 30 && navIndicators.Any(indicator => 
+     var navIndicators = new[] { "menu", "nav", "click", "home", "contact", "about", "login", "register", "search", "©", "cookie" };
+         return text.Length < 30 && navIndicators.Any(indicator => 
       text.ToLowerInvariant().Contains(indicator));
     }
+
+    /// <summary>
+    /// Extract all links from the page that are on the same domain
+    /// </summary>
+    public List<string> ExtractLinks(string html, string baseUrl, bool sameDomainOnly = true)
+    {
+        var links = new List<string>();
+
+        try
+        {
+            var doc = new HtmlDocument();
+            doc.LoadHtml(html);
+
+            if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri))
+                return links;
+
+            var anchorNodes = doc.DocumentNode.SelectNodes("//a[@href]");
+            if (anchorNodes == null)
+                return links;
+
+            var seenUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var anchor in anchorNodes)
+            {
+                var href = anchor.GetAttributeValue("href", string.Empty);
+                if (string.IsNullOrWhiteSpace(href))
+                    continue;
+
+                // Skip non-content links
+                if (href.StartsWith("#") || 
+                    href.StartsWith("javascript:") || 
+                    href.StartsWith("mailto:") ||
+                    href.StartsWith("tel:") ||
+                    href.EndsWith(".pdf") ||
+                    href.EndsWith(".jpg") ||
+                    href.EndsWith(".png") ||
+                    href.EndsWith(".gif") ||
+                    href.EndsWith(".zip") ||
+                    href.EndsWith(".exe"))
+                    continue;
+
+                // Resolve relative URLs
+                Uri? absoluteUri;
+                if (href.StartsWith("http://") || href.StartsWith("https://"))
+                {
+                    if (!Uri.TryCreate(href, UriKind.Absolute, out absoluteUri))
+                        continue;
+                }
+                else
+                {
+                    if (!Uri.TryCreate(baseUri, href, out absoluteUri))
+                        continue;
+                }
+
+                // Check same domain if required
+                if (sameDomainOnly && !string.Equals(absoluteUri.Host, baseUri.Host, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var normalizedUrl = absoluteUri.GetLeftPart(UriPartial.Path);
+
+                // Avoid duplicates
+                if (seenUrls.Contains(normalizedUrl))
+                    continue;
+
+                seenUrls.Add(normalizedUrl);
+                links.Add(normalizedUrl);
+            }
+
+            _logger.LogDebug("[ScraperAgent] Found {Count} unique links on {Url}", links.Count, baseUrl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[ScraperAgent] Error extracting links from {Url}", baseUrl);
+        }
+
+        return links;
+    }
+
+    /// <summary>
+    /// Scrape a URL and optionally follow links up to a certain depth
+    /// </summary>
+    public async Task<List<ScrapedPage>> ScrapeWithDepthAsync(
+        string startUrl, 
+        int depth, 
+        int maxPages, 
+        bool sameDomainOnly,
+        CancellationToken cancellationToken = default)
+    {
+        var scrapedPages = new List<ScrapedPage>();
+        var visitedUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var urlsToVisit = new Queue<(string Url, int CurrentDepth)>();
+
+        urlsToVisit.Enqueue((startUrl, 0));
+
+        while (urlsToVisit.Count > 0 && scrapedPages.Count < maxPages)
+        {
+            var (url, currentDepth) = urlsToVisit.Dequeue();
+
+            if (visitedUrls.Contains(url))
+                continue;
+
+            visitedUrls.Add(url);
+
+            try
+            {
+                _logger.LogInformation("[ScraperAgent] Crawling {Url} (depth {Depth}/{MaxDepth})", 
+                    url, currentDepth, depth);
+
+                // Download HTML
+                _httpClient.DefaultRequestHeaders.Clear();
+                _httpClient.DefaultRequestHeaders.Add("User-Agent", 
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+
+                var html = await _httpClient.GetStringAsync(url, cancellationToken);
+
+                // Parse and extract content
+                var doc = new HtmlDocument();
+                doc.LoadHtml(html);
+
+                // Remove unwanted elements
+                foreach (var selector in new[] { "//script", "//style", "//noscript" })
+                {
+                    var nodes = doc.DocumentNode.SelectNodes(selector);
+                    if (nodes != null)
+                    {
+                        foreach (var node in nodes)
+                            node.Remove();
+                    }
+                }
+
+                var content = CleanText(ExtractTextContent(doc.DocumentNode));
+
+                if (!string.IsNullOrWhiteSpace(content) && content.Length >= 50)
+                {
+                    scrapedPages.Add(new ScrapedPage
+                    {
+                        Url = url,
+                        Content = content,
+                        Title = doc.DocumentNode.SelectSingleNode("//title")?.InnerText?.Trim() ?? url,
+                        ScrapedAt = DateTime.UtcNow,
+                        Depth = currentDepth
+                    });
+
+                    _logger.LogInformation("[ScraperAgent] Scraped {Length} chars from {Url}", 
+                        content.Length, url);
+                }
+
+                // Extract links for next depth level
+                if (currentDepth < depth && scrapedPages.Count < maxPages)
+                {
+                    var links = ExtractLinks(html, url, sameDomainOnly);
+                    foreach (var link in links.Take(maxPages - scrapedPages.Count))
+                    {
+                        if (!visitedUrls.Contains(link))
+                        {
+                            urlsToVisit.Enqueue((link, currentDepth + 1));
+                        }
+                    }
+                }
+
+                // Small delay to be respectful
+                await Task.Delay(200, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[ScraperAgent] Failed to scrape {Url}", url);
+            }
+        }
+
+        _logger.LogInformation("[ScraperAgent] Crawl complete: {Count} pages scraped", scrapedPages.Count);
+        return scrapedPages;
+    }
+}
+
+/// <summary>
+/// Represents a single scraped page
+/// </summary>
+public class ScrapedPage
+{
+    public string Url { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public DateTime ScrapedAt { get; set; }
+    public int Depth { get; set; }
 }

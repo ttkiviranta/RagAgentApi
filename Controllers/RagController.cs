@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using RagAgentApi.Models;
+using RagAgentApi.Models.Requests;
 using RagAgentApi.Agents;
 using RagAgentApi.Services;
 using RagAgentApi.Filters;
@@ -77,6 +79,9 @@ public class RagController : ControllerBase
             context.State["url"] = request.Url;
             context.State["chunk_size"] = request.ChunkSize;
             context.State["chunk_overlap"] = request.ChunkOverlap;
+            context.State["crawl_depth"] = request.CrawlDepth;
+            context.State["max_pages"] = request.MaxPages;
+            context.State["same_domain_only"] = request.SameDomainOnly;
 
             // Execute the RAG pipeline
             var result = await _orchestratorAgent.ExecuteAsync(context, cancellationToken);
@@ -92,9 +97,12 @@ public class RagController : ControllerBase
                 thread_id = context.ThreadId,
                 message = result.Message,
                 chunks_processed = result.Data?.GetValueOrDefault("chunks_processed", 0),
+                pages_crawled = result.Data?.GetValueOrDefault("pages_crawled", 1),
                 url = request.Url,
                 chunk_size = request.ChunkSize,
                 chunk_overlap = request.ChunkOverlap,
+                crawl_depth = request.CrawlDepth,
+                max_pages = request.MaxPages,
                 execution_time_ms = result.Data?.GetValueOrDefault("execution_time_ms", 0)
             };
 
@@ -176,6 +184,105 @@ public class RagController : ControllerBase
             _logger.LogError(ex, "Error checking document existence");
             return StatusCode(500, new { error = $"Virhe dokumentin tarkistuksessa: {ex.Message}" });
         }
+    }
+
+    /// <summary>
+    /// Check if a document with the given URL already exists
+    /// </summary>
+    [HttpPost("check-document-url")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CheckDocumentUrlExists([FromBody] CheckUrlRequest request, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("[CheckDocumentUrl] Checking if URL exists: {Url}", request.Url);
+
+            // Compute URL hash (same method as PostgresStorageAgent)
+            var urlHash = ComputeMD5Hash(request.Url);
+
+            // Check database for existing document
+            var dbContext = HttpContext.RequestServices.GetRequiredService<Data.RagDbContext>();
+            var existingDocument = await dbContext.Documents
+                .FirstOrDefaultAsync(d => d.UrlHash == urlHash, cancellationToken);
+
+            var response = new
+            {
+                exists = existingDocument != null,
+                url = request.Url,
+                documentId = existingDocument?.Id,
+                title = existingDocument?.Title,
+                lastUpdated = existingDocument?.LastUpdated,
+                message = existingDocument != null 
+                    ? "Document with this URL already exists in the database." 
+                    : "URL not found in database."
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking document URL existence");
+            return StatusCode(500, new { error = $"Error checking document URL: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Delete a document and its chunks by URL
+    /// </summary>
+    [HttpPost("delete-document-url")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> DeleteDocumentByUrl([FromBody] CheckUrlRequest request, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("[DeleteDocumentUrl] Deleting document by URL: {Url}", request.Url);
+
+            var urlHash = ComputeMD5Hash(request.Url);
+            var dbContext = HttpContext.RequestServices.GetRequiredService<Data.RagDbContext>();
+
+            var existingDocument = await dbContext.Documents
+                .Include(d => d.Chunks)
+                .FirstOrDefaultAsync(d => d.UrlHash == urlHash, cancellationToken);
+
+            if (existingDocument == null)
+            {
+                return NotFound(new { error = "Document not found", url = request.Url });
+            }
+
+            // Remove chunks first (cascade should handle this, but being explicit)
+            if (existingDocument.Chunks.Any())
+            {
+                dbContext.DocumentChunks.RemoveRange(existingDocument.Chunks);
+            }
+
+            // Remove document
+            dbContext.Documents.Remove(existingDocument);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("[DeleteDocumentUrl] Document deleted successfully: {Url}", request.Url);
+
+            return Ok(new
+            {
+                success = true,
+                url = request.Url,
+                deletedDocumentId = existingDocument.Id,
+                chunksDeleted = existingDocument.Chunks.Count,
+                message = "Document and its chunks deleted successfully."
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting document by URL");
+            return StatusCode(500, new { error = $"Error deleting document: {ex.Message}" });
+        }
+    }
+
+    private static string ComputeMD5Hash(string input)
+    {
+        using var md5 = System.Security.Cryptography.MD5.Create();
+        var inputBytes = System.Text.Encoding.UTF8.GetBytes(input);
+        var hashBytes = md5.ComputeHash(inputBytes);
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
     /// <summary>
@@ -605,7 +712,8 @@ Context:
                 return BadRequest(CreateErrorResponse("ChunkOverlap must be less than ChunkSize/2"));
             }
 
-            _logger.LogInformation("Starting enhanced content ingestion for URL: {Url}", request.Url);
+            _logger.LogInformation("Starting enhanced content ingestion for URL: {Url}, Depth: {Depth}, MaxPages: {MaxPages}", 
+                request.Url, request.CrawlDepth, request.MaxPages);
 
             // Create new execution context
             var context = _orchestrationService.CreateContext();
@@ -614,6 +722,9 @@ Context:
             context.State["url"] = request.Url;
             context.State["chunk_size"] = request.ChunkSize;
             context.State["chunk_overlap"] = request.ChunkOverlap;
+            context.State["crawl_depth"] = request.CrawlDepth;
+            context.State["max_pages"] = request.MaxPages;
+            context.State["same_domain_only"] = request.SameDomainOnly;
             context.State["enhanced_mode"] = true; // Flag for enhanced processing
 
             // Execute the enhanced RAG pipeline with dynamic agent selection

@@ -28,39 +28,31 @@ public class A2AController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> SendMessage([FromBody] A2AMessageRequest request)
     {
-        try
+        _logger.LogInformation($"[A2AController] Sending message from {request.FromAgentName} to {request.ToAgentName}");
+
+        var agents = await _protocolService.GetRegisteredAgentsAsync();
+        var fromAgent = agents.FirstOrDefault(a => a.Name == request.FromAgentName);
+        var toAgent = agents.FirstOrDefault(a => a.Name == request.ToAgentName);
+
+        if (fromAgent == null || toAgent == null)
         {
-            _logger.LogInformation($"[A2AController] Sending message from {request.FromAgentName} to {request.ToAgentName}");
-
-            var agents = await _protocolService.GetRegisteredAgentsAsync();
-            var fromAgent = agents.FirstOrDefault(a => a.Name == request.FromAgentName);
-            var toAgent = agents.FirstOrDefault(a => a.Name == request.ToAgentName);
-
-            if (fromAgent == null || toAgent == null)
-            {
-                return BadRequest(new { error = "One or more agents not found" });
-            }
-
-            var message = new A2AMessage
-            {
-                ConversationId = request.ConversationId ?? Guid.NewGuid().ToString(),
-                FromAgentId = fromAgent.Id,
-                FromAgentName = request.FromAgentName,
-                ToAgentId = toAgent.Id,
-                ToAgentName = request.ToAgentName,
-                MessageType = request.MessageType ?? "task",
-                Content = request.Content,
-                Payload = request.Payload
-            };
-
-            var response = await _protocolService.SendMessageAsync(message);
-            return Ok(response);
+            return BadRequest(new { error = "One or more agents not found" });
         }
-        catch (Exception ex)
+
+        var message = new A2AMessage
         {
-            _logger.LogError($"[A2AController] Error: {ex.Message}");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
-        }
+            ConversationId = request.ConversationId ?? Guid.NewGuid().ToString(),
+            FromAgentId = fromAgent.Id,
+            FromAgentName = request.FromAgentName,
+            ToAgentId = toAgent.Id,
+            ToAgentName = request.ToAgentName,
+            MessageType = request.MessageType ?? "task",
+            Content = request.Content,
+            Payload = request.Payload
+        };
+
+        var response = await _protocolService.SendMessageAsync(message);
+        return Ok(response);
     }
 
     /// <summary>
@@ -70,16 +62,8 @@ public class A2AController : ControllerBase
     [ProducesResponseType(typeof(List<A2AMessage>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetConversationMessages(string conversationId)
     {
-        try
-        {
-            var messages = await _protocolService.GetMessageHistoryAsync(conversationId);
-            return Ok(messages);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"[A2AController] Error: {ex.Message}");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
-        }
+        var messages = await _protocolService.GetMessageHistoryAsync(conversationId);
+        return Ok(messages);
     }
 
     /// <summary>
@@ -89,16 +73,8 @@ public class A2AController : ControllerBase
     [ProducesResponseType(typeof(List<A2AAgent>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAgents()
     {
-        try
-        {
-            var agents = await _protocolService.GetRegisteredAgentsAsync();
-            return Ok(agents);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"[A2AController] Error: {ex.Message}");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
-        }
+        var agents = await _protocolService.GetRegisteredAgentsAsync();
+        return Ok(agents);
     }
 
     /// <summary>
@@ -109,21 +85,13 @@ public class A2AController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> RegisterAgent([FromBody] A2AAgent agent)
     {
-        try
+        if (string.IsNullOrEmpty(agent.Name))
         {
-            if (string.IsNullOrEmpty(agent.Name))
-            {
-                return BadRequest(new { error = "Agent name is required" });
-            }
+            return BadRequest(new { error = "Agent name is required" });
+        }
 
-            await _protocolService.RegisterAgentAsync(agent);
-            return Ok(new { message = $"Agent {agent.Name} registered successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"[A2AController] Error: {ex.Message}");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
-        }
+        await _protocolService.RegisterAgentAsync(agent);
+        return Ok(new { message = $"Agent {agent.Name} registered successfully" });
     }
 }
 

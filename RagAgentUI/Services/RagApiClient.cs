@@ -27,9 +27,22 @@ public class RagApiClient
     }
 
     // Ingest
-    public async Task<IngestResponse> IngestUrlAsync(string url)
+    public async Task<IngestResponse> IngestUrlAsync(string url, int crawlDepth = 0, int maxPages = 10, bool sameDomainOnly = true)
     {
-        var response = await _httpClient.PostAsJsonAsync("/api/rag/ingest-enhanced", new { url });
+        var request = new 
+        { 
+            url, 
+            chunkSize = 1000,
+            chunkOverlap = 200,
+            crawlDepth,
+            maxPages,
+            sameDomainOnly
+        };
+
+        _logger.LogInformation("[RagApiClient] Ingesting URL: {Url}, Depth: {Depth}, MaxPages: {MaxPages}", 
+            url, crawlDepth, maxPages);
+
+        var response = await _httpClient.PostAsJsonAsync("/api/rag/ingest-enhanced", request);
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync();
         return JsonSerializer.Deserialize<IngestResponse>(content, _jsonOptions) ??
@@ -88,6 +101,64 @@ public class RagApiClient
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "[RagApiClient] Error deleting document");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Check if a document with the given URL already exists
+    /// </summary>
+    public async Task<DocumentUrlCheckResult> CheckDocumentUrlExistsAsync(string url)
+    {
+        try
+        {
+            _logger.LogInformation("[RagApiClient] Checking if URL exists: {Url}", url);
+
+            var request = new { url };
+            var response = await _httpClient.PostAsJsonAsync("/api/rag/check-document-url", request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("[RagApiClient] URL check failed with status {Status}", response.StatusCode);
+                return new DocumentUrlCheckResult { Exists = false, Url = url };
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<DocumentUrlCheckResult>(content, _jsonOptions);
+
+            return result ?? new DocumentUrlCheckResult { Exists = false, Url = url };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[RagApiClient] Error checking document URL existence");
+            return new DocumentUrlCheckResult { Exists = false, Url = url };
+        }
+    }
+
+    /// <summary>
+    /// Delete a document by URL
+    /// </summary>
+    public async Task<bool> DeleteDocumentByUrlAsync(string url)
+    {
+        try
+        {
+            _logger.LogInformation("[RagApiClient] Deleting document by URL: {Url}", url);
+
+            var request = new { url };
+            var response = await _httpClient.PostAsJsonAsync("/api/rag/delete-document-url", request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("[RagApiClient] Delete by URL failed with status {Status}", response.StatusCode);
+                return false;
+            }
+
+            _logger.LogInformation("[RagApiClient] Document deleted by URL successfully");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[RagApiClient] Error deleting document by URL");
             return false;
         }
     }
@@ -413,5 +484,68 @@ public class RagApiClient
             _logger.LogError(ex, "[RagApiClient] Failed to log test error");
             return false;
         }
+    }
+
+    // A2A Pipeline Methods
+    public async Task<A2APipelineResult?> RunA2APipelineAsync()
+    {
+        try
+        {
+            _logger.LogInformation("[RagApiClient] Running A2A pipeline");
+            var response = await _httpClient.PostAsJsonAsync("/api/demo/run?demoType=a2a-pipeline", new { });
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<A2APipelineResult>(content, _jsonOptions);
+            }
+
+            _logger.LogWarning("[RagApiClient] A2A pipeline failed: {Status}", response.StatusCode);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[RagApiClient] Error running A2A pipeline");
+            return null;
+        }
+    }
+
+    public async Task<List<A2AAgentInfo>> GetA2AAgentsAsync()
+    {
+        try
+        {
+            _logger.LogInformation("[RagApiClient] Getting A2A agents");
+            var response = await _httpClient.GetAsync("/api/a2a/agents");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<List<A2AAgentInfo>>(content, _jsonOptions) ?? new();
+            }
+
+            return new List<A2AAgentInfo>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[RagApiClient] Error getting A2A agents");
+            return new List<A2AAgentInfo>();
+        }
+    }
+
+    // A2A Models
+    public class A2APipelineResult
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public object? Data { get; set; }
+        public double DurationMs { get; set; }
+    }
+
+    public class A2AAgentInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public List<string> Capabilities { get; set; } = new();
     }
 }

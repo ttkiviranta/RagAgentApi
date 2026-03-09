@@ -2,6 +2,7 @@ using AIMonitoringAgent.Shared.Models;
 using AIMonitoringAgent.Shared.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using RagAgentApi.Services;
 
 namespace RagAgentApi.Controllers;
 
@@ -13,11 +14,13 @@ namespace RagAgentApi.Controllers;
 public class TestController : ControllerBase
 {
     private readonly IEmailNotifier _emailNotifier;
+    private readonly IErrorLogService _errorLogService;
     private readonly ILogger<TestController> _logger;
 
-    public TestController(IEmailNotifier emailNotifier, ILogger<TestController> logger)
+    public TestController(IEmailNotifier emailNotifier, IErrorLogService errorLogService, ILogger<TestController> logger)
     {
         _emailNotifier = emailNotifier;
+        _errorLogService = errorLogService;
         _logger = logger;
     }
 
@@ -82,6 +85,46 @@ public class TestController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send test email");
+
+            // Log error to database for Error Dashboard visibility
+            try
+            {
+                var errorAnalysis = new AnalysisResult
+                {
+                    ErrorId = "email-" + Guid.NewGuid().ToString().Substring(0, 8),
+                    Severity = "ERROR",
+                    Category = "Email.Notification",
+                    RootCauseAnalysis = $"Email sending failed: {ex.Message}",
+                    RecommendedActions = new List<string>
+                    {
+                        "Check email configuration in appsettings.json",
+                        "Verify Azure Communication Services connection string",
+                        "Ensure email provider is properly configured"
+                    },
+                    AffectedOperations = new List<string> { "EmailNotification", "TestEmail" },
+                    IsRecurring = false,
+                    SimilarErrorCount = 0,
+                    AffectedUsers = 0,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                var errorException = new AppInsightsException
+                {
+                    ExceptionType = ex.GetType().Name,
+                    Message = ex.Message,
+                    StackTrace = ex.StackTrace ?? "No stack trace available",
+                    Timestamp = DateTime.UtcNow,
+                    OperationName = "SendTestEmail",
+                    RequestId = HttpContext.TraceIdentifier
+                };
+
+                await _errorLogService.LogErrorAsync(errorAnalysis, errorException, Array.Empty<string>());
+            }
+            catch (Exception logEx)
+            {
+                _logger.LogWarning(logEx, "Failed to log email error to database");
+            }
+
             return StatusCode(500, new
             {
                 error = "Failed to send test email",

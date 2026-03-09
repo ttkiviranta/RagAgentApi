@@ -1,7 +1,7 @@
 @page "/demos/a2a"
 @using RagAgentUI.Services
 @using System.Text.Json
-@inject HttpClient Http
+@inject RagApiClient ApiClient
 @inject ILogger<A2APipeline> Logger
 
 <div class="p-8 max-w-7xl mx-auto">
@@ -22,7 +22,8 @@
         <div class="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
             <button @onclick="RunA2APipeline"
                     disabled="@IsRunning"
-                    class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium">
+                    title="Execute the full Agent-to-Agent pipeline: Orchestrator → Scraper → Chunker → Embedding → Storage → Query. Demonstrates real-time communication between AI agents in the RAG system."
+                    class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium transition-colors">
                 @if (IsRunning)
                 {
                     <span>⏳ Running Pipeline...</span>
@@ -35,13 +36,15 @@
 
             <button @onclick="GetRegisteredAgents"
                     disabled="@IsRunning"
-                    class="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium">
+                    title="Load and display all registered AI agents in the system. Shows agent names, types, descriptions, and their capabilities."
+                    class="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium transition-colors">
                 🤖 Load Agents
             </button>
 
             <button @onclick="ClearResults"
                     disabled="@IsRunning"
-                    class="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium">
+                    title="Clear all pipeline execution results and error messages from the display. Does not affect stored data."
+                    class="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium transition-colors">
                 🗑️ Clear Results
             </button>
         </div>
@@ -195,11 +198,26 @@
 
         try
         {
-            var response = await Http.PostAsJsonAsync("/api/demo/run?demoType=a2a-pipeline", new { });
-            if (response.IsSuccessStatusCode)
+            var result = await ApiClient.RunA2APipelineAsync();
+            if (result != null)
             {
-                var json = await response.Content.ReadAsStringAsync();
-                PipelineResult = JsonSerializer.Deserialize<DemoResultInfo>(json);
+                // Convert object to JsonElement if needed
+                JsonElement? dataElement = null;
+                if (result.Data is JsonElement je)
+                {
+                    dataElement = je;
+                }
+                else if (result.Data != null)
+                {
+                    var json = JsonSerializer.Serialize(result.Data);
+                    dataElement = JsonSerializer.Deserialize<JsonElement>(json);
+                }
+
+                PipelineResult = new DemoResultInfo 
+                { 
+                    Success = result.Success, 
+                    Data = dataElement 
+                };
             }
             else
             {
@@ -221,12 +239,14 @@
     {
         try
         {
-            var response = await Http.GetAsync("/api/a2a/agents");
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                Agents = JsonSerializer.Deserialize<List<A2AAgentInfo>>(json) ?? new();
-            }
+            var agents = await ApiClient.GetA2AAgentsAsync();
+            Agents = agents.Select(a => new A2AAgentInfo 
+            { 
+                Name = a.Name, 
+                Description = a.Description, 
+                Type = a.Type, 
+                Capabilities = a.Capabilities 
+            }).ToList();
         }
         catch (Exception ex)
         {
@@ -243,34 +263,65 @@
 
     private T GetSummaryData<T>(string key)
     {
-        if (PipelineResult?.Data is JsonElement dataElement)
+        try
         {
-            var summaryElement = dataElement.GetProperty("summary");
-            if (summaryElement.TryGetProperty(key, out var value))
+            if (PipelineResult?.Data is JsonElement dataElement)
             {
-                return JsonSerializer.Deserialize<T>(value.GetRawText()) ?? default(T)!;
+                if (dataElement.TryGetProperty("summary", out var summaryElement))
+                {
+                    if (summaryElement.TryGetProperty(key, out var value))
+                    {
+                        return JsonSerializer.Deserialize<T>(value.GetRawText()) ?? default(T)!;
+                    }
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Error getting summary data for key: {Key}", key);
         }
         return default(T)!;
     }
 
     private List<object>? GetPipelineSteps()
     {
-        if (PipelineResult?.Data is JsonElement dataElement)
+        try
         {
-            if (dataElement.TryGetProperty("pipelineSteps", out var stepsElement))
+            if (PipelineResult?.Data is JsonElement dataElement)
             {
-                return JsonSerializer.Deserialize<List<object>>(stepsElement.GetRawText());
+                if (dataElement.TryGetProperty("pipelineSteps", out var stepsElement))
+                {
+                    return JsonSerializer.Deserialize<List<object>>(stepsElement.GetRawText());
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Error getting pipeline steps");
         }
         return null;
     }
 
     private string GetJsonProperty(JsonElement? element, string key)
     {
-        if (element?.TryGetProperty(key, out var value) == true)
+        try
         {
-            return value.GetString() ?? value.ToString();
+            if (element?.TryGetProperty(key, out var value) == true)
+            {
+                return value.ValueKind switch
+                {
+                    JsonValueKind.String => value.GetString() ?? string.Empty,
+                    JsonValueKind.Number => value.GetRawText(),
+                    JsonValueKind.True => "true",
+                    JsonValueKind.False => "false",
+                    JsonValueKind.Null => string.Empty,
+                    _ => value.ToString()
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Error getting JSON property: {Key}", key);
         }
         return string.Empty;
     }

@@ -5,6 +5,7 @@ using RagAgentApi.Services.A2A;
 using RagAgentApi.Filters;
 using RagAgentApi.Data;
 using RagAgentApi.Hubs;
+using RagAgentApi.Middleware;
 using AIMonitoringAgent.Shared.Services;
 using System.Reflection;
 using Microsoft.OpenApi.Models;
@@ -202,6 +203,11 @@ builder.Services.AddHealthChecks();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+
+// Global exception handling - captures all unhandled exceptions,
+// logs them to database, and sends email notifications for critical errors
+app.UseGlobalExceptionHandling();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -212,11 +218,10 @@ if (app.Environment.IsDevelopment())
         options.DocumentTitle = "RAG Agent API";
         options.DisplayRequestDuration();
     });
-    app.UseDeveloperExceptionPage();
+    // Note: DeveloperExceptionPage is disabled to allow GlobalExceptionMiddleware to handle errors
 }
 else
 {
-    app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
 

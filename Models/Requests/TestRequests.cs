@@ -34,3 +34,11 @@ public class TestAgentTypeRequest
 {
     public string AgentTypeName { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Request for checking if a URL already exists in the database
+/// </summary>
+public class CheckUrlRequest
+{
+    public string Url { get; set; } = string.Empty;
+}
