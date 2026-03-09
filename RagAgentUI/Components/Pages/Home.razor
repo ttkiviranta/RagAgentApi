@@ -66,10 +66,11 @@
                 {
                     <ChatMessage IsUser="false"
                                  Content="@streamingMessage"
-                                 CreatedAt="DateTime.Now" />
+                                 CreatedAt="DateTime.Now"
+                                 Sources="@currentSources" />
                 }
 
-                @if (isStreaming)
+                @if (isStreaming && string.IsNullOrEmpty(streamingMessage))
                 {
                     <div class="flex justify-start mb-4">
                         <div class="bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3">
@@ -169,6 +170,12 @@
     private bool showNewChatDialog = false;
     private string newChatTitle = string.Empty;
 
+    // Event handler references for proper cleanup
+    private Func<string, Task>? _chunkHandler;
+    private Func<string, Task>? _sourcesHandler;
+    private Func<Task>? _completeHandler;
+    private Func<string, Task>? _errorHandler;
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -178,17 +185,18 @@
             // ← ATTACH HANDLERS FIRST (before connecting!)
 
             // Handle incoming message chunks
-            ChatHub.OnMessageChunkReceived += async (chunk) =>
+            _chunkHandler = async (chunk) =>
             {
                 Console.WriteLine($"[Home] Handler: OnMessageChunkReceived fired with {chunk.Length} chars");
                 streamingMessage += chunk;
                 await InvokeAsync(StateHasChanged);
                 await ScrollToBottom();
             };
+            ChatHub.OnMessageChunkReceived += _chunkHandler;
             Console.WriteLine("[Home] OnMessageChunkReceived handler attached");
 
             // ← Handle incoming sources
-            ChatHub.OnSourcesReceived += async (sourcesJson) =>
+            _sourcesHandler = async (sourcesJson) =>
             {
                 Console.WriteLine($"[Home] Handler: OnSourcesReceived fired with {sourcesJson.Length} chars");
                 try
@@ -203,52 +211,72 @@
                     await JS.InvokeVoidAsync("debugLog.error", $"[Home] Error deserializing sources: {ex.Message}");
                 }
             };
+            ChatHub.OnSourcesReceived += _sourcesHandler;
             Console.WriteLine("[Home] OnSourcesReceived handler attached");
 
-            ChatHub.OnMessageComplete += async () =>
+            _completeHandler = async () =>
             {
                 Console.WriteLine("[Home] Handler: OnMessageComplete fired");
                 await JS.InvokeVoidAsync("debugLog.log", "[Home] Message complete");
-                isStreaming = false;
 
-                // Add the completed streaming message to messages list
-                if (!string.IsNullOrEmpty(streamingMessage) && currentConversationId.HasValue)
+                try
                 {
-                    await JS.InvokeVoidAsync("debugLog.log", $"[Home] Adding streaming message to list: {streamingMessage.Length} chars");
-                    // Fetch only the latest assistant message from database
-                    var history = await ApiClient.GetConversationHistoryAsync(currentConversationId.Value);
-                    var latestAssistantMessage = history
-                        .Where(m => m.Role == "assistant")
-                        .OrderByDescending(m => m.CreatedAt)
-                        .FirstOrDefault();
-
-                    if (latestAssistantMessage != null && 
-                        !messages!.Any(m => m.Id == latestAssistantMessage.Id))
+                    // Add the completed streaming message to messages list
+                    if (!string.IsNullOrEmpty(streamingMessage) && currentConversationId.HasValue)
                     {
-                        // Use currentSources if available
-                        if (currentSources?.Any() == true)
+                        await JS.InvokeVoidAsync("debugLog.log", $"[Home] Adding streaming message to list: {streamingMessage.Length} chars");
+                        // Fetch only the latest assistant message from database
+                        var history = await ApiClient.GetConversationHistoryAsync(currentConversationId.Value);
+                        var latestAssistantMessage = history
+                            .Where(m => m.Role == "assistant")
+                            .OrderByDescending(m => m.CreatedAt)
+                            .FirstOrDefault();
+
+                        if (latestAssistantMessage != null && 
+                            !messages!.Any(m => m.Id == latestAssistantMessage.Id))
                         {
-                            await JS.InvokeVoidAsync("debugLog.log", $"[Home] Attaching {currentSources.Count} sources to message");
-                            latestAssistantMessage = latestAssistantMessage with { Sources = currentSources };
+                            // Use currentSources if available (real-time), otherwise use sources from database
+                            if (currentSources?.Any() == true)
+                            {
+                                await JS.InvokeVoidAsync("debugLog.log", $"[Home] Attaching {currentSources.Count} real-time sources to message");
+                                latestAssistantMessage = latestAssistantMessage with { Sources = currentSources };
+                            }
+                            else if (latestAssistantMessage.Sources?.Any() == true)
+                            {
+                                await JS.InvokeVoidAsync("debugLog.log", $"[Home] Using {latestAssistantMessage.Sources.Count} sources from database");
+                            }
+
+                            messages!.Add(latestAssistantMessage);
+                            await JS.InvokeVoidAsync("debugLog.log", $"[Home] Message added to list, total messages: {messages.Count}");
                         }
-
-                        messages!.Add(latestAssistantMessage);
                     }
+
+                    // Reload conversations list to update message count
+                    await LoadConversations();
+
+                    // Update UI to show the new message with sources
+                    await InvokeAsync(StateHasChanged);
+                    await ScrollToBottom();
                 }
-
-                streamingMessage = string.Empty;
-                currentSources = new();  // ← Reset sources for next message
-
-                // Reload conversations list to update message count
-                await LoadConversations();
-
-                // ← IMPORTANT: StateHasChanged + scroll
-                await InvokeAsync(StateHasChanged);
-                await ScrollToBottom();
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Home] Exception in OnMessageComplete: {ex.Message}");
+                    await JS.InvokeVoidAsync("debugLog.error", $"[Home] Exception: {ex.Message}");
+                }
+                finally
+                {
+                    // Always reset state to allow new queries
+                    streamingMessage = string.Empty;
+                    currentSources = new();
+                    isStreaming = false;
+                    await InvokeAsync(StateHasChanged);
+                    await JS.InvokeVoidAsync("debugLog.log", "[Home] State reset complete, ready for new query");
+                }
             };
+            ChatHub.OnMessageComplete += _completeHandler;
             Console.WriteLine("[Home] OnMessageComplete handler attached");
 
-            ChatHub.OnError += async (error) =>
+            _errorHandler = async (error) =>
             {
                 Console.WriteLine($"[Home] Handler: OnError fired with: {error}");
                 await JS.InvokeVoidAsync("debugLog.error", $"[Home] ChatHub error: {error}");
@@ -256,6 +284,7 @@
                 isStreaming = false;
                 await InvokeAsync(StateHasChanged);
             };
+            ChatHub.OnError += _errorHandler;
             Console.WriteLine("[Home] OnError handler attached");
 
             // ← NOW connect (after handlers are attached!)
@@ -303,14 +332,14 @@
     private async Task LoadConversations()
     {
         conversations = await ApiClient.GetConversationsAsync();
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task LoadConversation(Guid conversationId)
     {
         currentConversationId = conversationId;
         messages = await ApiClient.GetConversationHistoryAsync(conversationId);
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
         await ScrollToBottom();
     }
 
@@ -413,6 +442,16 @@
 
     public async ValueTask DisposeAsync()
     {
+        // Unsubscribe event handlers to prevent handler accumulation
+        if (_chunkHandler != null)
+            ChatHub.OnMessageChunkReceived -= _chunkHandler;
+        if (_sourcesHandler != null)
+            ChatHub.OnSourcesReceived -= _sourcesHandler;
+        if (_completeHandler != null)
+            ChatHub.OnMessageComplete -= _completeHandler;
+        if (_errorHandler != null)
+            ChatHub.OnError -= _errorHandler;
+
         await ChatHub.DisposeAsync();
     }
 }

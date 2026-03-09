@@ -130,13 +130,14 @@ _logger.LogError(ex, "Failed to generate embedding for text of length {Length}",
     {
         // Build system prompt based on whether context is available
         string systemPrompt;
-        
+
         if (string.IsNullOrWhiteSpace(context))
         {
             // No context - use general ChatGPT knowledge
             systemPrompt = @"You are a helpful AI assistant. Answer the user's question based on your general knowledge.
 Be concise, accurate, and helpful. If you're not certain about something, clearly state your level of confidence.
-Provide practical and useful information.";
+Provide practical and useful information.
+IMPORTANT: Always respond in the same language as the user's question.";
         }
         else
         {
@@ -148,6 +149,7 @@ IMPORTANT RULES:
 - If the context doesn't contain the answer, clearly state that you don't have that information
 - Do NOT use your general knowledge to answer questions
 - Be concise and cite specific parts of the context when relevant
+- Always respond in the same language as the user's question
 
 Context:
 {context}

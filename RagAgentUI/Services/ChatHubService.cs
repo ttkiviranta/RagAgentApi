@@ -17,21 +17,35 @@ public class ChatHubService : IAsyncDisposable
         _configuration = configuration;
     }
 
-public async Task ConnectAsync()
+    public async Task ConnectAsync()
     {
+        // Don't reconnect if already connected
+        if (_hubConnection?.State == HubConnectionState.Connected)
+        {
+            Console.WriteLine("[ChatHubService] Already connected, skipping reconnection");
+            return;
+        }
+
+        // Dispose existing connection if any
+        if (_hubConnection is not null)
+        {
+            Console.WriteLine("[ChatHubService] Disposing existing connection before reconnecting");
+            await _hubConnection.DisposeAsync();
+        }
+
         _hubConnection = new HubConnectionBuilder()
- .WithUrl(_configuration["ApiSettings:SignalRHub"] ?? "http://localhost:5000/chathub")
-.WithAutomaticReconnect()
+            .WithUrl(_configuration["ApiSettings:SignalRHub"] ?? "http://localhost:5000/chathub")
+            .WithAutomaticReconnect()
             .Build();
 
         _hubConnection.On<string>("ReceiveChunk", async (chunk) =>
- {
-   Console.WriteLine($"[ChatHubService] ReceiveChunk event fired: {chunk.Length} chars");
-   if (OnMessageChunkReceived != null)
-       await OnMessageChunkReceived.Invoke(chunk);
-   else
-       Console.WriteLine("[ChatHubService] OnMessageChunkReceived is null!");
-   });
+        {
+            Console.WriteLine($"[ChatHubService] ReceiveChunk event fired: {chunk.Length} chars");
+            if (OnMessageChunkReceived != null)
+                await OnMessageChunkReceived.Invoke(chunk);
+            else
+                Console.WriteLine("[ChatHubService] OnMessageChunkReceived is null!");
+        });
 
         _hubConnection.On<string>("ReceiveSources", async (sourcesJson) =>  // ← NEW
         {
@@ -44,58 +58,60 @@ public async Task ConnectAsync()
 
         _hubConnection.On("ReceiveComplete", async () =>
         {
-         Console.WriteLine("[ChatHubService] ReceiveComplete event fired");
-         if (OnMessageComplete != null)
-   await OnMessageComplete.Invoke();
+            Console.WriteLine("[ChatHubService] ReceiveComplete event fired");
+            if (OnMessageComplete != null)
+                await OnMessageComplete.Invoke();
+            else
+                Console.WriteLine("[ChatHubService] OnMessageComplete is null!");
         });
 
         _hubConnection.On<string>("ReceiveError", async (error) =>
         {
-   Console.WriteLine($"[ChatHubService] ReceiveError event fired: {error}");
-   if (OnError != null)
-       await OnError.Invoke(error);
+            Console.WriteLine($"[ChatHubService] ReceiveError event fired: {error}");
+            if (OnError != null)
+                await OnError.Invoke(error);
         });
 
         try
         {
             Console.WriteLine("[ChatHubService] Starting connection...");
-await _hubConnection.StartAsync();
+            await _hubConnection.StartAsync();
             Console.WriteLine("[ChatHubService] Connection started successfully");
         }
-    catch (Exception ex)
+        catch (Exception ex)
         {
             Console.WriteLine($"SignalR connection failed: {ex.Message}");
-   }
+        }
     }
-    
+
     public async Task StreamQueryAsync(string query, Guid conversationId)
     {
         if (_hubConnection?.State == HubConnectionState.Connected)
-      {
+        {
             try
-  {
-              await _hubConnection.SendAsync("StreamQuery", query, conversationId);
+            {
+                await _hubConnection.SendAsync("StreamQuery", query, conversationId);
             }
-         catch (Exception ex)
-     {
+            catch (Exception ex)
+            {
                 if (OnError != null)
-       await OnError.Invoke($"Failed to send message: {ex.Message}");
+                    await OnError.Invoke($"Failed to send message: {ex.Message}");
             }
-   }
-   else
-     {
-      if (OnError != null)
+        }
+        else
+        {
+            if (OnError != null)
                 await OnError.Invoke("SignalR connection not available. Using fallback mode.");
-   }
+        }
     }
-    
+
     public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
-    
+
     public async ValueTask DisposeAsync()
- {
+    {
         if (_hubConnection is not null)
         {
-    await _hubConnection.DisposeAsync();
+            await _hubConnection.DisposeAsync();
         }
     }
 }

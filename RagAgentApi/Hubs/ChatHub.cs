@@ -150,12 +150,8 @@ Be concise, accurate, and helpful. If you're not certain about something, say so
                 _logger.LogInformation("[ChatHub] Sending ReceiveSources with {Count} sources", sources.Count);
                 await Clients.Caller.SendAsync("ReceiveSources", sourcesJson);
 
-                // Add prefix to indicate document-based answer
-                var prefix = "[Answer from documents]\n\n";
-                _logger.LogInformation("[ChatHub] Sending ReceiveChunk (prefix): {Length} chars", prefix.Length);
-                await Clients.Caller.SendAsync("ReceiveChunk", prefix);
-                await Task.Delay(10); // Small delay to ensure delivery
-                fullAnswer = prefix;
+                // No prefix needed - let LLM respond naturally in user's language
+                fullAnswer = "";
 
                 // Stream answer from Azure OpenAI with context
                 int chunkCount = 0;

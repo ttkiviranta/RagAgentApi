@@ -48,4 +48,8 @@
     <Folder Include="Hubs\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include=".github\copilot-instructions.md" />
+  </ItemGroup>
+
 </Project>
