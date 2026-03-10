@@ -1,4 +1,5 @@
 using RagAgentUI.Models;
+using RagAgentUI.Components.Pages;
 using System.Text.Json;
 
 namespace RagAgentUI.Services;
@@ -547,5 +548,61 @@ public class RagApiClient
         public string Description { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty;
         public List<string> Capabilities { get; set; } = new();
+    }
+
+    // Edge IoT Methods
+    public async Task<List<EdgeIoTDemo.EquipmentInfo>> GetEdgeEquipmentAsync()
+    {
+        try
+        {
+            _logger.LogInformation("[RagApiClient] Getting Edge IoT equipment");
+            var response = await _httpClient.GetAsync("/api/edgeiot/equipment");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(content);
+
+                if (doc.RootElement.TryGetProperty("equipment", out var equipmentElement))
+                {
+                    return JsonSerializer.Deserialize<List<EdgeIoTDemo.EquipmentInfo>>(
+                        equipmentElement.GetRawText(), _jsonOptions) ?? new();
+                }
+            }
+
+            _logger.LogWarning("[RagApiClient] Failed to get equipment: {Status}", response.StatusCode);
+            return new List<EdgeIoTDemo.EquipmentInfo>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[RagApiClient] Error getting Edge IoT equipment");
+            return new List<EdgeIoTDemo.EquipmentInfo>();
+        }
+    }
+
+    public async Task<JsonElement?> RunEdgeAnalysisPipelineAsync(string equipmentId, bool simulateAnomaly, string anomalyType)
+    {
+        try
+        {
+            _logger.LogInformation("[RagApiClient] Running Edge analysis for {Equipment}, Anomaly: {Anomaly}", 
+                equipmentId, simulateAnomaly ? anomalyType : "none");
+
+            var url = $"/api/edgeiot/analyze/{equipmentId}?simulateAnomaly={simulateAnomaly}&anomalyType={anomalyType}";
+            var response = await _httpClient.PostAsync(url, null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<JsonElement>(content, _jsonOptions);
+            }
+
+            _logger.LogWarning("[RagApiClient] Edge analysis failed: {Status}", response.StatusCode);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[RagApiClient] Error running Edge analysis pipeline");
+            throw;
+        }
     }
 }

@@ -111,6 +111,10 @@ builder.Services.AddScoped<YouTubeTranscriptAgent>();
 builder.Services.AddScoped<ArxivScraperAgent>();
 builder.Services.AddScoped<NewsArticleScraperAgent>();
 
+// Edge IoT Agents
+builder.Services.AddScoped<EdgeSensorAgent>();
+builder.Services.AddScoped<EdgeAnalyzerAgent>();
+
 // Demo Services - Scoped for demo functionality
 builder.Services.AddScoped<ClassificationDemoService>();
 builder.Services.AddScoped<TimeSeriesDemoService>();

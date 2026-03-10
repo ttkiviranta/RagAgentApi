@@ -1,0 +1,538 @@
+@page "/demos/edge-iot"
+@using RagAgentUI.Services
+@using System.Text.Json
+@inject RagApiClient ApiClient
+@inject ILogger<EdgeIoTDemo> Logger
+
+<div class="p-8 max-w-7xl mx-auto">
+    <h1 class="text-3xl font-bold mb-2 text-gray-900 dark:text-white">🏭 Edge IoT - Predictive Maintenance Demo</h1>
+    <p class="text-gray-600 dark:text-gray-400 mb-8">
+        Industrial IoT simulation demonstrating edge-cloud hybrid AI agent architecture for predictive maintenance
+    </p>
+
+    <!-- Architecture Overview -->
+    <div class="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-6 border border-blue-200 dark:border-blue-700">
+        <h2 class="text-lg font-bold mb-4 text-gray-900 dark:text-white">Architecture Overview</h2>
+        <div class="flex flex-wrap items-center justify-center gap-4 text-sm">
+            <div class="flex items-center gap-2 bg-green-100 dark:bg-green-900 px-4 py-2 rounded-lg">
+                <span class="text-2xl">📡</span>
+                <div>
+                    <div class="font-bold text-green-800 dark:text-green-200">Edge Sensor</div>
+                    <div class="text-xs text-green-600 dark:text-green-400">Data Collection</div>
+                </div>
+            </div>
+            <span class="text-gray-400 text-2xl">→</span>
+            <div class="flex items-center gap-2 bg-yellow-100 dark:bg-yellow-900 px-4 py-2 rounded-lg">
+                <span class="text-2xl">🔍</span>
+                <div>
+                    <div class="font-bold text-yellow-800 dark:text-yellow-200">Edge Analyzer</div>
+                    <div class="text-xs text-yellow-600 dark:text-yellow-400">Local AI Analysis</div>
+                </div>
+            </div>
+            <span class="text-gray-400 text-2xl">→</span>
+            <div class="flex items-center gap-2 bg-blue-100 dark:bg-blue-900 px-4 py-2 rounded-lg">
+                <span class="text-2xl">☁️</span>
+                <div>
+                    <div class="font-bold text-blue-800 dark:text-blue-200">Cloud RAG</div>
+                    <div class="text-xs text-blue-600 dark:text-blue-400">Documentation Query</div>
+                </div>
+            </div>
+            <span class="text-gray-400 text-2xl">→</span>
+            <div class="flex items-center gap-2 bg-purple-100 dark:bg-purple-900 px-4 py-2 rounded-lg">
+                <span class="text-2xl">🔧</span>
+                <div>
+                    <div class="font-bold text-purple-800 dark:text-purple-200">Maintenance</div>
+                    <div class="text-xs text-purple-600 dark:text-purple-400">Work Order</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h2 class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Control Panel</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <!-- Equipment Selection -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Equipment</label>
+                <select @bind="SelectedEquipment" 
+                        class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    @foreach (var eq in Equipment)
+                    {
+                        <option value="@eq.Id">@eq.Name</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Anomaly Simulation -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Simulate Anomaly</label>
+                <select @bind="SelectedAnomaly"
+                        class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    @foreach (var anomaly in AnomalyTypes)
+                    {
+                        <option value="@anomaly.Id">@anomaly.Name</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Run Button -->
+            <div class="flex items-end">
+                <button @onclick="RunAnalysisPipeline"
+                        disabled="@IsRunning"
+                        class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                    @if (IsRunning)
+                    {
+                        <span>⏳ Analyzing...</span>
+                    }
+                    else
+                    {
+                        <span>▶️ Run Analysis Pipeline</span>
+                    }
+                </button>
+            </div>
+        </div>
+
+        <div class="flex gap-4">
+            <button @onclick="LoadEquipment"
+                    disabled="@IsRunning"
+                    class="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                🔄 Load Equipment
+            </button>
+            <button @onclick="ClearResults"
+                    disabled="@IsRunning"
+                    class="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                🗑️ Clear Results
+            </button>
+        </div>
+    </div>
+
+    <!-- Equipment List -->
+    @if (Equipment.Any())
+    {
+        <div class="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h2 class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Equipment Status</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                @foreach (var eq in Equipment)
+                {
+                    <div class="@(eq.Id == SelectedEquipment ? "ring-2 ring-blue-500" : "") bg-gray-50 dark:bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                         @onclick="() => SelectedEquipment = eq.Id">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-gray-900 dark:text-white">@eq.Name</h3>
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                @eq.Status
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">@eq.Type</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-500 mt-1">📍 @eq.Location</p>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Analysis Results -->
+    @if (AnalysisResult != null)
+    {
+        <div class="space-y-6">
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Health Score</p>
+                    <p class="text-3xl font-bold @GetHealthScoreColor(GetSensorData()?.HealthScore ?? 0)">
+                        @(GetSensorData()?.HealthScore ?? 0)%
+                    </p>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Anomalies</p>
+                    <p class="text-3xl font-bold @(GetAnomalyCount() > 0 ? "text-red-600" : "text-green-600")">
+                        @GetAnomalyCount()
+                    </p>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Edge Processing</p>
+                    <p class="text-3xl font-bold text-green-600">@(GetEdgeProcessingTime())ms</p>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Total Time</p>
+                    <p class="text-3xl font-bold text-blue-600">@(GetTotalExecutionTime())ms</p>
+                </div>
+            </div>
+
+            <!-- Sensor Data -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4 text-gray-900 dark:text-white">📊 Sensor Readings</h2>
+                @if (GetSensorData() is { } sensorData)
+                {
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                            <div class="text-3xl mb-2">🌡️</div>
+                            <div class="text-2xl font-bold text-gray-900 dark:text-white">@sensorData.Temperature°C</div>
+                            <div class="text-sm text-gray-500">Temperature</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                            <div class="text-3xl mb-2">📳</div>
+                            <div class="text-2xl font-bold text-gray-900 dark:text-white">@sensorData.Vibration</div>
+                            <div class="text-sm text-gray-500">Vibration (mm/s)</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                            <div class="text-3xl mb-2">⏱️</div>
+                            <div class="text-2xl font-bold text-gray-900 dark:text-white">@sensorData.Rpm</div>
+                            <div class="text-sm text-gray-500">RPM</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                            <div class="text-3xl mb-2">🔵</div>
+                            <div class="text-2xl font-bold text-gray-900 dark:text-white">@sensorData.Pressure</div>
+                            <div class="text-sm text-gray-500">Pressure (PSI)</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                            <div class="text-3xl mb-2">⚡</div>
+                            <div class="text-2xl font-bold text-gray-900 dark:text-white">@sensorData.PowerConsumption</div>
+                            <div class="text-sm text-gray-500">Power (kW)</div>
+                        </div>
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                            <div class="text-3xl mb-2">⏰</div>
+                            <div class="text-2xl font-bold text-gray-900 dark:text-white">@sensorData.OperatingHours</div>
+                            <div class="text-sm text-gray-500">Operating Hours</div>
+                        </div>
+                    </div>
+
+                    @if (sensorData.AnomalyFlags.Any())
+                    {
+                        <div class="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
+                            <p class="font-medium text-red-800 dark:text-red-200">⚠️ Anomaly Flags:</p>
+                            <div class="flex flex-wrap gap-2 mt-2">
+                                @foreach (var flag in sensorData.AnomalyFlags)
+                                {
+                                    <span class="px-3 py-1 bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200 rounded-full text-sm font-medium">
+                                        @flag
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+
+            <!-- Pipeline Steps -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4 text-gray-900 dark:text-white">🔄 Pipeline Execution</h2>
+                <div class="space-y-3">
+                    @foreach (var step in GetPipelineSteps())
+                    {
+                        <div class="flex items-center gap-4 p-4 rounded-lg @(step.AgentType == "Edge" ? "bg-green-50 dark:bg-green-900/20" : "bg-blue-50 dark:bg-blue-900/20")">
+                            <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center @(step.AgentType == "Edge" ? "bg-green-200 dark:bg-green-800" : "bg-blue-200 dark:bg-blue-800")">
+                                <span class="font-bold @(step.AgentType == "Edge" ? "text-green-800 dark:text-green-200" : "text-blue-800 dark:text-blue-200")">@step.StepNumber</span>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-gray-900 dark:text-white">@step.AgentName</span>
+                                    <span class="px-2 py-0.5 rounded text-xs font-medium @(step.AgentType == "Edge" ? "bg-green-200 text-green-800" : "bg-blue-200 text-blue-800")">
+                                        @step.AgentType
+                                    </span>
+                                </div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">@step.Action</p>
+                            </div>
+                            <div class="text-right">
+                                <span class="@(step.Success ? "text-green-600" : "text-red-600") text-xl">
+                                    @(step.Success ? "✓" : "✗")
+                                </span>
+                                <p class="text-sm text-gray-500">@step.ExecutionTimeMs ms</p>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Work Order (if generated) -->
+            @if (GetWorkOrder() is { } workOrder)
+            {
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 @(workOrder.Priority == "URGENT" ? "border-red-500" : "border-yellow-500")">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-bold text-gray-900 dark:text-white">📋 Generated Work Order</h2>
+                        <span class="px-3 py-1 rounded-full text-sm font-bold @(workOrder.Priority == "URGENT" ? "bg-red-200 text-red-800" : "bg-yellow-200 text-yellow-800")">
+                            @workOrder.Priority
+                        </span>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <p class="text-sm text-gray-500">Work Order ID</p>
+                            <p class="font-mono font-bold text-gray-900 dark:text-white">@workOrder.Id</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Assigned To</p>
+                            <p class="font-bold text-gray-900 dark:text-white">@workOrder.AssignedTo</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Equipment</p>
+                            <p class="font-bold text-gray-900 dark:text-white">@workOrder.EquipmentId</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Est. Duration</p>
+                            <p class="font-bold text-gray-900 dark:text-white">@workOrder.EstimatedDuration</p>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-500 mb-2">Description</p>
+                        <p class="text-gray-900 dark:text-white">@workOrder.Description</p>
+                    </div>
+
+                    @if (workOrder.RequiredParts.Any())
+                    {
+                        <div class="mb-4">
+                            <p class="text-sm text-gray-500 mb-2">Required Parts</p>
+                            <div class="flex flex-wrap gap-2">
+                                @foreach (var part in workOrder.RequiredParts)
+                                {
+                                    <span class="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm">@part</span>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (workOrder.Procedures.Any())
+                    {
+                        <div>
+                            <p class="text-sm text-gray-500 mb-2">Maintenance Procedures</p>
+                            <ol class="list-decimal list-inside space-y-1 text-gray-900 dark:text-white">
+                                @foreach (var proc in workOrder.Procedures)
+                                {
+                                    <li class="text-sm">@proc</li>
+                                }
+                            </ol>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Error Message -->
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="mt-4 p-4 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-lg">
+            <p class="text-red-800 dark:text-red-200 font-medium">Error: @ErrorMessage</p>
+        </div>
+    }
+</div>
+
+@code {
+    private bool IsRunning = false;
+    private string SelectedEquipment = "pump-01";
+    private string SelectedAnomaly = "none";
+    private string ErrorMessage = string.Empty;
+    private JsonElement? AnalysisResult = null;
+
+    private List<EquipmentInfo> Equipment = new();
+    private List<AnomalyTypeInfo> AnomalyTypes = new()
+    {
+        new("none", "Normal Operation", "No anomaly - equipment operating within normal parameters"),
+        new("overheating", "Overheating", "Temperature exceeds safe operating limits"),
+        new("bearing_wear", "Bearing Wear", "Excessive vibration indicating bearing degradation"),
+        new("pressure_drop", "Pressure Drop", "System pressure below minimum threshold"),
+        new("speed_fluctuation", "Speed Fluctuation", "RPM unstable or outside normal range"),
+        new("critical", "Critical Failure", "Multiple anomalies indicating imminent failure")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEquipment();
+    }
+
+    private async Task LoadEquipment()
+    {
+        try
+        {
+            var result = await ApiClient.GetEdgeEquipmentAsync();
+            Equipment = result;
+            if (Equipment.Any() && string.IsNullOrEmpty(SelectedEquipment))
+            {
+                SelectedEquipment = Equipment.First().Id;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading equipment");
+            // Use default equipment if API fails
+            Equipment = new List<EquipmentInfo>
+            {
+                new() { Id = "pump-01", Name = "Main Coolant Pump", Type = "Centrifugal Pump", Location = "Building A, Floor 1", Status = "Online" },
+                new() { Id = "motor-01", Name = "Production Line Motor", Type = "AC Induction Motor", Location = "Building A, Floor 2", Status = "Online" },
+                new() { Id = "compressor-01", Name = "Air Compressor Unit", Type = "Rotary Screw", Location = "Building B, Utility", Status = "Online" },
+                new() { Id = "conveyor-01", Name = "Assembly Conveyor", Type = "Belt Conveyor", Location = "Building A, Floor 1", Status = "Online" }
+            };
+        }
+    }
+
+    private async Task RunAnalysisPipeline()
+    {
+        IsRunning = true;
+        ErrorMessage = string.Empty;
+        AnalysisResult = null;
+
+        try
+        {
+            var result = await ApiClient.RunEdgeAnalysisPipelineAsync(
+                SelectedEquipment, 
+                SelectedAnomaly != "none", 
+                SelectedAnomaly);
+
+            AnalysisResult = result;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Logger.LogError(ex, "Error running analysis pipeline");
+        }
+        finally
+        {
+            IsRunning = false;
+        }
+    }
+
+    private void ClearResults()
+    {
+        AnalysisResult = null;
+        ErrorMessage = string.Empty;
+    }
+
+    private SensorDataInfo? GetSensorData()
+    {
+        try
+        {
+            if (AnalysisResult?.TryGetProperty("sensorData", out var sensorElement) == true)
+            {
+                return JsonSerializer.Deserialize<SensorDataInfo>(sensorElement.GetRawText());
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private int GetAnomalyCount()
+    {
+        try
+        {
+            if (AnalysisResult?.TryGetProperty("summary", out var summary) == true &&
+                summary.TryGetProperty("anomaliesDetected", out var count))
+            {
+                return count.GetInt32();
+            }
+        }
+        catch { }
+        return 0;
+    }
+
+    private long GetEdgeProcessingTime()
+    {
+        try
+        {
+            if (AnalysisResult?.TryGetProperty("edgeProcessingTimeMs", out var time) == true)
+            {
+                return time.GetInt64();
+            }
+        }
+        catch { }
+        return 0;
+    }
+
+    private long GetTotalExecutionTime()
+    {
+        try
+        {
+            if (AnalysisResult?.TryGetProperty("totalExecutionTimeMs", out var time) == true)
+            {
+                return time.GetInt64();
+            }
+        }
+        catch { }
+        return 0;
+    }
+
+    private List<PipelineStepInfo> GetPipelineSteps()
+    {
+        try
+        {
+            if (AnalysisResult?.TryGetProperty("pipelineSteps", out var steps) == true)
+            {
+                return JsonSerializer.Deserialize<List<PipelineStepInfo>>(steps.GetRawText()) ?? new();
+            }
+        }
+        catch { }
+        return new();
+    }
+
+    private WorkOrderInfo? GetWorkOrder()
+    {
+        try
+        {
+            if (AnalysisResult?.TryGetProperty("workOrder", out var workOrder) == true && 
+                workOrder.ValueKind != JsonValueKind.Null)
+            {
+                return JsonSerializer.Deserialize<WorkOrderInfo>(workOrder.GetRawText());
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private string GetHealthScoreColor(int score)
+    {
+        return score switch
+        {
+            >= 80 => "text-green-600",
+            >= 60 => "text-yellow-600",
+            >= 40 => "text-orange-600",
+            _ => "text-red-600"
+        };
+    }
+
+    public class EquipmentInfo
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string Location { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+    }
+
+    public record AnomalyTypeInfo(string Id, string Name, string Description);
+
+    public class SensorDataInfo
+    {
+        public string EquipmentId { get; set; } = string.Empty;
+        public double Temperature { get; set; }
+        public double Vibration { get; set; }
+        public double Pressure { get; set; }
+        public int Rpm { get; set; }
+        public double PowerConsumption { get; set; }
+        public int OperatingHours { get; set; }
+        public int HealthScore { get; set; }
+        public List<string> AnomalyFlags { get; set; } = new();
+    }
+
+    public class PipelineStepInfo
+    {
+        public int StepNumber { get; set; }
+        public string AgentName { get; set; } = string.Empty;
+        public string AgentType { get; set; } = string.Empty;
+        public string Action { get; set; } = string.Empty;
+        public bool Success { get; set; }
+        public long ExecutionTimeMs { get; set; }
+    }
+
+    public class WorkOrderInfo
+    {
+        public string Id { get; set; } = string.Empty;
+        public string EquipmentId { get; set; } = string.Empty;
+        public string Priority { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string EstimatedDuration { get; set; } = string.Empty;
+        public List<string> RequiredParts { get; set; } = new();
+        public List<string> Procedures { get; set; } = new();
+        public string AssignedTo { get; set; } = string.Empty;
+    }
+}
