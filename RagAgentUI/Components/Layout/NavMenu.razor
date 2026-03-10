@@ -3,28 +3,44 @@
 <nav class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3">
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-6">
-            <NavLink href="/" class="text-gray-600 dark:text-gray-300 hover:text-blue-500 font-medium">
-                Chat
+            <NavLink href="/" 
+                     title="AI-powered chat interface with RAG (Retrieval-Augmented Generation). Ask questions and get answers from your ingested documents."
+                     class="text-gray-600 dark:text-gray-300 hover:text-blue-500 font-medium">
+                💬 Chat
             </NavLink>
-            <NavLink href="/ingest" class="text-gray-600 dark:text-gray-300 hover:text-blue-500 font-medium">
-                Ingest URL
+            <NavLink href="/ingest" 
+                     title="Ingest web content by URL. Supports GitHub repos, YouTube videos, arXiv papers, news articles, and general web pages."
+                     class="text-gray-600 dark:text-gray-300 hover:text-blue-500 font-medium">
+                🌐 Ingest URL
             </NavLink>
-            <NavLink href="/ingest-file" class="text-gray-600 dark:text-gray-300 hover:text-blue-500 font-medium">
+            <NavLink href="/ingest-file" 
+                     title="Upload and process PDF documents. Content is chunked, embedded, and stored for RAG queries."
+                     class="text-gray-600 dark:text-gray-300 hover:text-blue-500 font-medium">
                 📄 Upload PDF
             </NavLink>
-            <NavLink href="/analytics" class="text-gray-600 dark:text-gray-300 hover:text-blue-500 font-medium">
-                Analytics
+            <NavLink href="/analytics" 
+                     title="View system analytics: agent execution stats, document counts, query performance metrics."
+                     class="text-gray-600 dark:text-gray-300 hover:text-blue-500 font-medium">
+                📊 Analytics
             </NavLink>
-            <NavLink href="/error-dashboard" class="text-gray-600 dark:text-gray-300 hover:text-red-500 font-medium">
+            <NavLink href="/error-dashboard" 
+                     title="Monitor application errors and exceptions. View error logs, severity levels, and stack traces."
+                     class="text-gray-600 dark:text-gray-300 hover:text-red-500 font-medium">
                 🚨 Errors
             </NavLink>
-            <NavLink href="/demos" class="text-gray-600 dark:text-gray-300 hover:text-blue-500 font-medium">
+            <NavLink href="/demos" 
+                     title="AI/ML demo gallery: Classification, Time Series, Image Processing, Audio Processing demos."
+                     class="text-gray-600 dark:text-gray-300 hover:text-blue-500 font-medium">
                 🤖 Demos
             </NavLink>
-            <NavLink href="/demos/a2a" class="text-gray-600 dark:text-gray-300 hover:text-blue-500 font-medium">
+            <NavLink href="/demos/a2a" 
+                     title="Agent-to-Agent Pipeline Demo: Visualize real-time communication between AI agents in the RAG pipeline (Orchestrator → Scraper → Chunker → Embedding → Storage)."
+                     class="text-gray-600 dark:text-gray-300 hover:text-blue-500 font-medium">
                 🔄 A2A
             </NavLink>
-            <NavLink href="/demos/edge-iot" class="text-gray-600 dark:text-gray-300 hover:text-green-500 font-medium">
+            <NavLink href="/demos/edge-iot" 
+                     title="Edge IoT Predictive Maintenance Demo: Industrial IoT simulation with edge-cloud hybrid architecture. Simulate sensor data, detect anomalies, and generate maintenance work orders."
+                     class="text-gray-600 dark:text-gray-300 hover:text-green-500 font-medium">
                 🏭 Edge IoT
             </NavLink>
         </div>
