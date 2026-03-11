@@ -99,3 +99,6 @@ coverage
 ehthumbs.db
 Thumbs.db
 node_modules/
+
+# Personal files - not for version control
+PRESENTATION_GUIDE.txt

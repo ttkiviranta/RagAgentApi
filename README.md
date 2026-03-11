@@ -36,6 +36,18 @@ The API implements an **enhanced multi-agent architecture** where specialized ag
 - **AgentFactory**: **NEW** - Dynamically creates agent pipelines from database configuration
 - **URL Pattern Matching**: Regex-based routing (GitHub → GitHub agent, YouTube → YouTube agent, etc.)
 
+## 🧱 Architecture Overview
+
+This diagram shows the full system architecture across five layers: the Blazor UI, the .NET API, the multi‑agent layer, the PostgreSQL + pgvector vector database, and the Azure OpenAI LLM layer.
+
+![Architecture Overview](docs/images/architecture-overview.png)
+
+## 🔄 Ingestion Pipeline
+
+This diagram highlights the ingestion flow step by step: Scraper → Chunker → Embedding → Storage → Embedding model.
+
+![Ingestion Pipeline](docs/images/ingestion-pipeline.png)
+
 ## 🚀 Features
 
 ### Enhanced Core Capabilities
