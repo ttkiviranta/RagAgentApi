@@ -405,7 +405,7 @@
         {
             if (AnalysisResult?.TryGetProperty("sensorData", out var sensorElement) == true)
             {
-                return JsonSerializer.Deserialize<SensorDataInfo>(sensorElement.GetRawText());
+                return JsonSerializer.Deserialize<SensorDataInfo>(sensorElement.GetRawText(), _jsonOptions);
             }
         }
         catch { }
@@ -458,12 +458,17 @@
         {
             if (AnalysisResult?.TryGetProperty("pipelineSteps", out var steps) == true)
             {
-                return JsonSerializer.Deserialize<List<PipelineStepInfo>>(steps.GetRawText()) ?? new();
+                return JsonSerializer.Deserialize<List<PipelineStepInfo>>(steps.GetRawText(), _jsonOptions) ?? new();
             }
         }
         catch { }
         return new();
     }
+
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     private WorkOrderInfo? GetWorkOrder()
     {
@@ -472,7 +477,7 @@
             if (AnalysisResult?.TryGetProperty("workOrder", out var workOrder) == true && 
                 workOrder.ValueKind != JsonValueKind.Null)
             {
-                return JsonSerializer.Deserialize<WorkOrderInfo>(workOrder.GetRawText());
+                return JsonSerializer.Deserialize<WorkOrderInfo>(workOrder.GetRawText(), _jsonOptions);
             }
         }
         catch { }
