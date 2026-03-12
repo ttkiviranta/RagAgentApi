@@ -83,6 +83,25 @@ The final processed result is returned to the user after all agent interactions 
 
 ![A2A Pipeline](docs/images/a2a-pipeline.png)
 
+## 🧬 AgentContext Flow
+
+This diagram illustrates how the `AgentContext` object flows through each stage of the agent pipeline.
+
+The OrchestratorAgent creates the initial context, which includes three key components:
+- **State** — shared data passed between agents
+- **Messages** — communication history and agent outputs
+- **Metadata** — execution details, diagnostics, and agent-specific information
+
+As the pipeline progresses, each agent updates the context:
+- **ScraperAgent** adds raw content and scraping metadata
+- **ChunkerAgent** splits content and appends chunking information
+- **EmbeddingAgent** generates vector embeddings and stores embedding metadata
+- **QueryAgent** performs semantic search and adds retrieval metrics
+
+At the final stage, the system compiles the aggregated context into a unified result, which is returned to the user.
+
+![AgentContext Flow](docs/images/agentcontext-flow.png)
+
 ## 🚀 Features
 
 ### Enhanced Core Capabilities
