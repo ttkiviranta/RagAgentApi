@@ -48,6 +48,18 @@ This diagram highlights the ingestion flow step by step: Scraper → Chunker →
 
 ![Ingestion Pipeline](docs/images/ingestion-pipeline.png)
 
+## 🧠 OrchestratorAgent Logic
+
+This diagram illustrates the internal decision-making and execution flow of the OrchestratorAgent.
+
+The process begins by analyzing the input context and selecting the appropriate agent types.
+A dynamic pipeline is then built based on the selected agents.
+Each agent is executed sequentially, with context updates and error checks at every step.
+All execution metrics, statuses, and telemetry logs are recorded for monitoring and visualization.
+Finally, the OrchestratorAgent compiles the results and returns a unified output.
+
+![OrchestratorAgent Logic](docs/images/orchestrator-agent-logic.png)
+
 ## 🚀 Features
 
 ### Enhanced Core Capabilities
