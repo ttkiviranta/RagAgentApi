@@ -72,6 +72,17 @@ Finally, the system returns the answer to the user.
 
 ![Query Pipeline](docs/images/query-pipeline.png)
 
+## 🔁 A2A Pipeline
+
+This diagram visualizes the Agent‑to‑Agent (A2A) communication pipeline.
+The OrchestratorAgent selects the required agents and initiates the workflow.
+Each agent communicates directly with the next using the A2A protocol, passing context, results, and status updates.
+The Scraper, Chunker, Embedding, Query, and ErrorMonitor agents form a dynamic interaction chain where each step can influence the next.
+All messages and execution metrics are recorded in the logging and telemetry system, enabling real‑time monitoring and full pipeline traceability.
+The final processed result is returned to the user after all agent interactions are complete.
+
+![A2A Pipeline](docs/images/a2a-pipeline.png)
+
 ## 🚀 Features
 
 ### Enhanced Core Capabilities
