@@ -60,6 +60,18 @@ Finally, the OrchestratorAgent compiles the results and returns a unified output
 
 ![OrchestratorAgent Logic](docs/images/orchestrator-agent-logic.png)
 
+## 🔍 Query Pipeline
+
+This diagram illustrates the flow of a user query through the multi-agent system.
+
+The process begins when a user submits a question.
+The OrchestratorAgent analyzes the query and selects the appropriate agent(s) to handle it.
+Typically, the QueryAgent performs a semantic search against the vector database to retrieve relevant documents.
+These documents are then passed to Azure OpenAI, which uses a large language model (GPT-3.5 or GPT-4) to generate a context-aware response.
+Finally, the system returns the answer to the user.
+
+![Query Pipeline](docs/images/query-pipeline.png)
+
 ## 🚀 Features
 
 ### Enhanced Core Capabilities
