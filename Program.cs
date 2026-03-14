@@ -78,8 +78,16 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// Add HTTP client for web scraping
-builder.Services.AddHttpClient();
+// Add HTTP client for web scraping with extended timeout for deep crawling
+builder.Services.AddHttpClient("ScraperAgent", client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(10); // Extended timeout for deep web crawling
+    client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+});
+builder.Services.AddHttpClient(); // Default for other services
+
+// Playwright service for JavaScript-rendered sites (singleton for browser reuse)
+builder.Services.AddSingleton<IPlaywrightScraperService, PlaywrightScraperService>();
 
 // Azure Services - Singleton for connection reuse
 builder.Services.AddSingleton<IAzureOpenAIService, AzureOpenAIService>();
@@ -97,7 +105,7 @@ builder.Services.AddScoped<IErrorLogService, ErrorLogService>();
 
 // Agents - Scoped for request lifecycle
 builder.Services.AddScoped<OrchestratorAgent>();
-builder.Services.AddScoped<ScraperAgent>();
+builder.Services.AddScoped<ScraperAgent>(); // Uses IHttpClientFactory with "ScraperAgent" named client
 builder.Services.AddScoped<ChunkerAgent>();
 builder.Services.AddScoped<EmbeddingAgent>();
 builder.Services.AddScoped<StorageAgent>(); // Original Azure-based

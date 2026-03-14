@@ -12,8 +12,11 @@ builder.Services.AddApplicationInsightsTelemetry(options =>
     options.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
 });
 
-// HttpClient for API
-builder.Services.AddHttpClient<RagApiClient>();
+// HttpClient for API with extended timeout for long-running operations
+builder.Services.AddHttpClient<RagApiClient>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(15); // Extended timeout for deep web scraping
+});
 
 // SignalR ChatHub service
 builder.Services.AddScoped<ChatHubService>();

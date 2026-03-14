@@ -1,19 +1,28 @@
 using RagAgentApi.Models;
+using RagAgentApi.Services;
 using HtmlAgilityPack;
 using System.Text;
 
 namespace RagAgentApi.Agents;
 
 /// <summary>
-/// Scrapes content from web pages and cleans HTML
+/// Scrapes content from web pages and cleans HTML.
+/// Uses standard HTTP for simple sites, falls back to Playwright for JavaScript-heavy sites.
 /// </summary>
 public class ScraperAgent : BaseRagAgent
 {
     private readonly HttpClient _httpClient;
+    private readonly IPlaywrightScraperService _playwrightService;
+    private const string HttpClientName = "ScraperAgent";
 
-    public ScraperAgent(HttpClient httpClient, ILogger<ScraperAgent> logger) : base(logger)
+    public ScraperAgent(
+        IHttpClientFactory httpClientFactory, 
+        ILogger<ScraperAgent> logger,
+        IPlaywrightScraperService playwrightService) : base(logger)
     {
-        _httpClient = httpClient;
+        _httpClient = httpClientFactory.CreateClient(HttpClientName);
+        _playwrightService = playwrightService;
+        _logger.LogInformation("[ScraperAgent] Initialized with Playwright support");
     }
 
  public override string Name => "ScraperAgent";
@@ -42,12 +51,54 @@ public class ScraperAgent : BaseRagAgent
 
             _logger.LogInformation("[ScraperAgent] Scraping content from {Url}, Depth: {Depth}, MaxPages: {MaxPages}", url, crawlDepth, maxPages);
 
-            // Use depth-aware scraping if crawl depth > 0
-            if (crawlDepth > 0)
-            {
-                var scrapedPages = await ScrapeWithDepthAsync(url, crawlDepth, maxPages, sameDomainOnly, cancellationToken);
+                        // Check if we should use Playwright (for JavaScript-heavy sites)
+                        var usePlaywright = context.State.TryGetValue("use_playwright", out var pwObj) && pwObj is bool pw && pw;
 
-                if (!scrapedPages.Any())
+                                                // Use depth-aware scraping if crawl depth > 0
+                                                if (crawlDepth > 0)
+                                                {
+                                                    List<ScrapedPage> scrapedPages;
+
+                                                    if (usePlaywright)
+                                                    {
+                                                        _logger.LogInformation("[ScraperAgent] Using Playwright for JavaScript rendering (explicit)");
+                                                        var playwrightResults = await _playwrightService.ScrapeWithDepthAsync(url, crawlDepth, maxPages, sameDomainOnly, cancellationToken);
+                                                        scrapedPages = playwrightResults
+                                                            .Where(r => r.Success)
+                                                            .Select(r => new ScrapedPage
+                                                            {
+                                                                Url = r.Url,
+                                                                Title = r.Title ?? r.Url,
+                                                                Content = r.Content ?? string.Empty,
+                                                                ScrapedAt = r.ScrapedAt,
+                                                                Depth = r.Depth
+                                                            })
+                                                            .ToList();
+                                                    }
+                                                    else
+                                                    {
+                                                        scrapedPages = await ScrapeWithDepthAsync(url, crawlDepth, maxPages, sameDomainOnly, cancellationToken);
+
+                                                        // Fallback to Playwright if standard scraping found nothing
+                                                        if (!scrapedPages.Any())
+                                                        {
+                                                            _logger.LogInformation("[ScraperAgent] Standard scraping failed, trying Playwright fallback");
+                                                            var playwrightResults = await _playwrightService.ScrapeWithDepthAsync(url, crawlDepth, maxPages, sameDomainOnly, cancellationToken);
+                                                            scrapedPages = playwrightResults
+                                                                .Where(r => r.Success)
+                                                                .Select(r => new ScrapedPage
+                                                                {
+                                                                    Url = r.Url,
+                                                                    Title = r.Title ?? r.Url,
+                                                                    Content = r.Content ?? string.Empty,
+                                                                    ScrapedAt = r.ScrapedAt,
+                                                                    Depth = r.Depth
+                                                                })
+                                                                .ToList();
+                                                        }
+                                                    }
+
+                            if (!scrapedPages.Any())
                 {
                     return AgentResult.CreateFailure($"No content found from {url} or linked pages");
                 }
@@ -88,7 +139,10 @@ public class ScraperAgent : BaseRagAgent
             // Single page scraping (original logic)
             _httpClient.DefaultRequestHeaders.Clear();
             _httpClient.DefaultRequestHeaders.Add("User-Agent", 
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            _httpClient.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+            _httpClient.DefaultRequestHeaders.Add("Accept-Language", "fi-FI,fi;q=0.9,en;q=0.8");
+            _httpClient.DefaultRequestHeaders.Add("Cache-Control", "no-cache");
 
      // Download HTML content
        var html = await _httpClient.GetStringAsync(uri, cancellationToken);
@@ -174,6 +228,26 @@ public class ScraperAgent : BaseRagAgent
         _logger.LogDebug("[ScraperAgent] Used body fallback extraction: {Length} chars", cleanedContent.Length);
          }
        }
+
+      // If still no content, try Playwright for JavaScript-rendered sites
+      if (string.IsNullOrWhiteSpace(cleanedContent) || cleanedContent.Length < 20)
+      {
+          _logger.LogInformation("[ScraperAgent] No content from HTTP scraping, trying Playwright for JavaScript rendering");
+          try
+          {
+              var playwrightResult = await _playwrightService.ScrapeAsync(url, 3000, cancellationToken);
+              if (playwrightResult.Success && !string.IsNullOrWhiteSpace(playwrightResult.Content))
+              {
+                  cleanedContent = playwrightResult.Content;
+                  _logger.LogInformation("[ScraperAgent] Playwright extracted {Length} chars from {Url}", 
+                      cleanedContent.Length, url);
+              }
+          }
+          catch (Exception pwEx)
+          {
+              _logger.LogWarning(pwEx, "[ScraperAgent] Playwright fallback failed for {Url}", url);
+          }
+      }
 
       if (string.IsNullOrWhiteSpace(cleanedContent) || cleanedContent.Length < 10)
       {
@@ -406,12 +480,16 @@ return blockElements.Contains(tagName);
                 _logger.LogInformation("[ScraperAgent] Crawling {Url} (depth {Depth}/{MaxDepth})", 
                     url, currentDepth, depth);
 
-                // Download HTML
+                // Download HTML with full browser-like headers
                 _httpClient.DefaultRequestHeaders.Clear();
                 _httpClient.DefaultRequestHeaders.Add("User-Agent", 
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                _httpClient.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+                _httpClient.DefaultRequestHeaders.Add("Accept-Language", "fi-FI,fi;q=0.9,en;q=0.8");
+                _httpClient.DefaultRequestHeaders.Add("Cache-Control", "no-cache");
 
                 var html = await _httpClient.GetStringAsync(url, cancellationToken);
+                _logger.LogDebug("[ScraperAgent] Downloaded {Length} chars from {Url}", html.Length, url);
 
                 // Parse and extract content
                 var doc = new HtmlDocument();
@@ -429,8 +507,10 @@ return blockElements.Contains(tagName);
                 }
 
                 var content = CleanText(ExtractTextContent(doc.DocumentNode));
+                _logger.LogDebug("[ScraperAgent] Extracted {Length} chars of text from {Url}", content?.Length ?? 0, url);
 
-                if (!string.IsNullOrWhiteSpace(content) && content.Length >= 50)
+                // Lower threshold for JavaScript-heavy sites - even 20 chars is meaningful
+                if (!string.IsNullOrWhiteSpace(content) && content.Length >= 20)
                 {
                     scrapedPages.Add(new ScrapedPage
                     {
