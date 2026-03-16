@@ -11,7 +11,12 @@ namespace RagAgentApi.Services;
 /// </summary>
 public interface IErrorLogService
 {
+    // Existing AppInsights-based logging
     Task<ErrorLog> LogErrorAsync(AnalysisResult analysis, AppInsightsException exception, string[] notificationChannels);
+
+    // NEW: Pipeline error logging overload
+    Task<ErrorLog> LogErrorAsync(string message, string category, string severity, string operationName, string? requestId);
+
     Task<ErrorLog?> GetErrorByIdAsync(string errorId);
     Task<List<ErrorLog>> GetErrorsAsync(int limit = 100, int offset = 0);
     Task<List<ErrorLog>> GetErrorsByDateRangeAsync(DateTime startDate, DateTime endDate);
@@ -31,9 +36,12 @@ public class ErrorLogService : IErrorLogService
     }
 
     /// <summary>
-    /// Log an error to the database
+    /// Log an AppInsights-analyzed error to the database
     /// </summary>
-    public async Task<ErrorLog> LogErrorAsync(AnalysisResult analysis, AppInsightsException exception, string[] notificationChannels)
+    public async Task<ErrorLog> LogErrorAsync(
+        AnalysisResult analysis,
+        AppInsightsException exception,
+        string[] notificationChannels)
     {
         try
         {
@@ -73,6 +81,56 @@ public class ErrorLogService : IErrorLogService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to log error to database");
+            throw;
+        }
+    }
+
+    // --------------------------------------------------------------------
+    // NEW: Pipeline error logging overload (used by OrchestratorAgent)
+    // --------------------------------------------------------------------
+    public async Task<ErrorLog> LogErrorAsync(
+        string message,
+        string category,
+        string severity,
+        string operationName,
+        string? requestId)
+    {
+        try
+        {
+            var errorLog = new ErrorLog
+            {
+                Id = Guid.NewGuid(),
+                ErrorId = Guid.NewGuid().ToString(),
+                ExceptionType = "PipelineError",
+                Message = message,
+                StackTrace = null,
+                Severity = severity,
+                Category = category,
+                RootCauseAnalysis = message,
+                RecommendedActions = "[]",
+                AffectedOperations = "[]",
+                OperationName = operationName,
+                RequestId = requestId,
+                IsRecurring = false,
+                SimilarErrorCount = 0,
+                AffectedUsers = 0,
+                Timestamp = DateTime.UtcNow,
+                NotificationSent = false,
+                NotificationSentAt = null,
+                NotificationChannels = "[]",
+                Metadata = null
+            };
+
+            _context.ErrorLogs.Add(errorLog);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Pipeline error logged: {ErrorId}", errorLog.ErrorId);
+
+            return errorLog;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to log pipeline error");
             throw;
         }
     }
