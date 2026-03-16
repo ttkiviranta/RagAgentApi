@@ -495,6 +495,35 @@ Current specialized agents are **placeholder implementations** and require addit
 - Advanced citation tracking and cross-referencing
 - Real-time content monitoring and updates
 
+### Additional Future Enhancements
+
+**LLM Observability Dashboard**  
+Add a full observability layer for all agent pipelines using Application Insights and OpenTelemetry. Include latency metrics, token usage, cost estimation, agent‑level performance, and pipeline heatmaps to provide production‑grade monitoring for AI workloads.
+
+**RAG Evaluation Suite**  
+Implement an automated evaluation framework for RAG quality using semantic similarity scoring, hallucination detection, regression testing, and benchmark datasets. This ensures measurable and repeatable quality improvements.
+
+**Plugin‑Based Agent Architecture**  
+Introduce a plugin system where agents can be dynamically discovered and loaded (DLL discovery). Allow pipelines to be defined via JSON configuration and support hot‑swappable agent types for maximum extensibility.
+
+**Document Access Control & Audit Trail**  
+Add fine‑grained access control for ingested documents, including user‑level permissions and full audit logging. Track who queried what, when, and with which documents to meet enterprise security requirements.
+
+**Hybrid Vector Search (BM25 + Embeddings)**  
+Implement a hybrid retrieval strategy combining pgvector embeddings with BM25 keyword scoring. Provide weighted scoring and fallback logic to improve retrieval accuracy across diverse document types.
+
+**Synthetic Data Generator for RAG Testing**  
+Create a synthetic data generator that produces test documents, query–answer pairs, and evaluation datasets. This enables safe testing without real customer data and supports automated RAG benchmarking.
+
+**Long‑Term Conversation Memory**  
+Add vector‑based conversation threading with summarization, TTL policies, and memory pruning. This enables persistent multi‑turn conversations and more intelligent agent behavior.
+
+**LLM‑Driven Agent Selector**  
+Enhance the agent selection system with an LLM‑based meta‑agent that chooses the optimal pipeline based on query intent. Include reasoning traces (without exposing chain‑of‑thought) and fallback strategies.
+
+**Backstage.io Integration Plugin**  
+Create a Backstage plugin that exposes agent types, pipeline executions, telemetry, and documentation via TechDocs. This integrates the system into a modern developer portal and improves discoverability.
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
