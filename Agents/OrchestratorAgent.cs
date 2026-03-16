@@ -12,16 +12,17 @@ namespace RagAgentApi.Agents;
 public class OrchestratorAgent : BaseRagAgent
 {
     private readonly AgentSelectorService _agentSelectorService;
-private readonly AgentFactory _agentFactory;
+    private readonly AgentFactory _agentFactory;
     private readonly RagDbContext _context;
 
     public OrchestratorAgent(
         AgentSelectorService agentSelectorService,
         AgentFactory agentFactory,
         RagDbContext context,
-   ILogger<OrchestratorAgent> logger) : base(logger)
+        ILogger<OrchestratorAgent> logger,
+        IErrorLogService? errorLogService = null) : base(logger, errorLogService)
     {
-   _agentSelectorService = agentSelectorService;
+        _agentSelectorService = agentSelectorService;
         _agentFactory = agentFactory;
         _context = context;
     }

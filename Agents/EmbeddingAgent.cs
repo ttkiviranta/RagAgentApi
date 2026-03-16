@@ -11,11 +11,15 @@ public class EmbeddingAgent : BaseRagAgent
  private readonly IAzureOpenAIService _openAIService;
     private readonly IConfiguration _configuration;
 
-   public EmbeddingAgent(IAzureOpenAIService openAIService, IConfiguration configuration, ILogger<EmbeddingAgent> logger) : base(logger)
- {
-   _openAIService = openAIService;
-        _configuration = configuration;
-    }
+   public EmbeddingAgent(
+           IAzureOpenAIService openAIService, 
+           IConfiguration configuration, 
+           ILogger<EmbeddingAgent> logger,
+           IErrorLogService? errorLogService = null) : base(logger, errorLogService)
+       {
+           _openAIService = openAIService;
+           _configuration = configuration;
+       }
 
     public override string Name => "EmbeddingAgent";
 

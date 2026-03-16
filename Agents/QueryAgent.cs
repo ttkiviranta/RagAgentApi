@@ -14,13 +14,14 @@ public class QueryAgent : BaseRagAgent
 
     public QueryAgent(
         IAzureSearchService searchService,
-    IAzureOpenAIService openAIService,
+        IAzureOpenAIService openAIService,
         IConfiguration configuration,
-        ILogger<QueryAgent> logger) : base(logger)
+        ILogger<QueryAgent> logger,
+        IErrorLogService? errorLogService = null) : base(logger, errorLogService)
     {
-     _searchService = searchService;
+        _searchService = searchService;
         _openAIService = openAIService;
-     _configuration = configuration;
+        _configuration = configuration;
     }
 
     public override string Name => "QueryAgent";

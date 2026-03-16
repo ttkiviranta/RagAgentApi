@@ -15,12 +15,13 @@ public class PostgresQueryAgent : BaseRagAgent
 
     public PostgresQueryAgent(
         PostgresQueryService queryService,
-      IAzureOpenAIService openAIService,
+        IAzureOpenAIService openAIService,
         ConversationService conversationService,
-      IConfiguration configuration,
-        ILogger<PostgresQueryAgent> logger) : base(logger)
+        IConfiguration configuration,
+        ILogger<PostgresQueryAgent> logger,
+        IErrorLogService? errorLogService = null) : base(logger, errorLogService)
     {
-     _queryService = queryService;
+        _queryService = queryService;
         _openAIService = openAIService;
         _conversationService = conversationService;
         _configuration = configuration;

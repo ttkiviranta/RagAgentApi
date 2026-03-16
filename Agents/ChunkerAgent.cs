@@ -1,4 +1,5 @@
 using RagAgentApi.Models;
+using RagAgentApi.Services;
 using System.Text.RegularExpressions;
 
 namespace RagAgentApi.Agents;
@@ -10,10 +11,13 @@ public class ChunkerAgent : BaseRagAgent
 {
     private readonly IConfiguration _configuration;
 
-  public ChunkerAgent(IConfiguration configuration, ILogger<ChunkerAgent> logger) : base(logger)
-    {
-        _configuration = configuration;
-    }
+  public ChunkerAgent(
+          IConfiguration configuration, 
+          ILogger<ChunkerAgent> logger,
+          IErrorLogService? errorLogService = null) : base(logger, errorLogService)
+      {
+          _configuration = configuration;
+      }
 
     public override string Name => "ChunkerAgent";
 

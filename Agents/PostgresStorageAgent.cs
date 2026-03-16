@@ -1,6 +1,7 @@
 using RagAgentApi.Models;
 using RagAgentApi.Models.PostgreSQL;
 using RagAgentApi.Data;
+using RagAgentApi.Services;
 using Microsoft.EntityFrameworkCore;
 using Pgvector;
 using System.Security.Cryptography;
@@ -16,8 +17,11 @@ public class PostgresStorageAgent : BaseRagAgent
 {
     private readonly RagDbContext _context;
 
-    public PostgresStorageAgent(RagDbContext context, ILogger<PostgresStorageAgent> logger) : base(logger)
-  {
+    public PostgresStorageAgent(
+        RagDbContext context, 
+        ILogger<PostgresStorageAgent> logger,
+        IErrorLogService? errorLogService = null) : base(logger, errorLogService)
+    {
         _context = context;
     }
 

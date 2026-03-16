@@ -14,7 +14,8 @@ public class ScraperAgent : BaseRagAgent
     public ScraperAgent(
         IHttpClientFactory httpClientFactory,
         ILogger<ScraperAgent> logger,
-        IPlaywrightScraperService playwrightService) : base(logger)
+        IPlaywrightScraperService playwrightService,
+        IErrorLogService? errorLogService = null) : base(logger, errorLogService)
     {
         _httpClient = httpClientFactory.CreateClient(HttpClientName);
         _playwrightService = playwrightService;
