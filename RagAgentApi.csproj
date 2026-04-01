@@ -16,6 +16,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="RagAgentApi.Tests\**" />
+    <Content Remove="RagAgentApi.Tests\**" />
+    <EmbeddedResource Remove="RagAgentApi.Tests\**" />
+    <None Remove="RagAgentApi.Tests\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI" Version="1.0.0-beta.17" />
     <PackageReference Include="Azure.Search.Documents" Version="11.5.1" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />

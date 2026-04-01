@@ -395,6 +395,122 @@ For detailed demo documentation, see:
 
 ## 🧪 Testing & Development
 
+### Unit Tests
+
+The project includes a comprehensive test suite using **xUnit**, **Moq**, and **FluentAssertions**.
+
+#### Test Project Structure
+
+```
+RagAgentApi.Tests/
+├── Models/
+│   ├── AgentMessageTests.cs      # Tests for AgentMessage model
+│   ├── AgentContextTests.cs      # Tests for AgentContext model
+│   └── AgentResultTests.cs       # Tests for AgentResult model
+├── Agents/
+│   └── ChunkerAgentTests.cs      # Tests for ChunkerAgent functionality
+├── Services/
+│   ├── AgentFactoryTests.cs      # Tests for agent creation and registration
+│   ├── AgentOrchestrationServiceTests.cs  # Tests for context management
+│   └── ConversationServiceTests.cs        # Tests for conversation operations
+├── TestDbContext.cs              # InMemory test database context
+└── RagAgentApi.Tests.csproj      # Test project configuration
+```
+
+#### Running Tests
+
+**Using .NET CLI:**
+```bash
+# Run all tests
+dotnet test
+
+# Run tests with detailed output
+dotnet test --verbosity normal
+
+# Run tests with code coverage
+dotnet test --collect:"XPlat Code Coverage"
+
+# Run specific test project
+dotnet test RagAgentApi.Tests/RagAgentApi.Tests.csproj
+
+# Run tests matching a filter
+dotnet test --filter "FullyQualifiedName~ChunkerAgent"
+dotnet test --filter "ClassName=AgentFactoryTests"
+```
+
+**Using Visual Studio:**
+1. Open **Test Explorer** (Test → Test Explorer or `Ctrl+E, T`)
+2. Click **Run All** to execute all tests
+3. Use filters to run specific test categories
+
+#### Test Categories
+
+| Category | Description | Test Count |
+|----------|-------------|------------|
+| **Models** | Data model initialization, properties, and behavior | ~30 tests |
+| **Agents** | Agent execution, chunking logic, error handling | ~10 tests |
+| **Services** | Factory patterns, orchestration, database operations | ~46 tests |
+
+#### Testing Frameworks
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| xUnit | 2.6.3 | Test framework |
+| Moq | 4.20.70 | Mocking framework |
+| FluentAssertions | 6.12.0 | Assertion library |
+| Microsoft.EntityFrameworkCore.InMemory | 8.0.8 | In-memory database for tests |
+
+#### TestDbContext
+
+The `TestDbContext` class is a specialized DbContext for testing that bypasses PostgreSQL-specific features (pgvector, JSONB columns) that aren't supported by the InMemory provider:
+
+```csharp
+// Example: Using TestDbContext in tests
+var options = new DbContextOptionsBuilder<RagDbContext>()
+    .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+    .Options;
+
+using var context = new TestDbContext(options);
+```
+
+#### Writing New Tests
+
+Follow the existing patterns when adding tests:
+
+```csharp
+public class MyNewServiceTests
+{
+    private readonly Mock<ILogger<MyService>> _loggerMock;
+
+    public MyNewServiceTests()
+    {
+        _loggerMock = new Mock<ILogger<MyService>>();
+    }
+
+    [Fact]
+    public void MethodName_Scenario_ExpectedBehavior()
+    {
+        // Arrange
+        var service = new MyService(_loggerMock.Object);
+
+        // Act
+        var result = service.DoSomething();
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("input1", "expected1")]
+    [InlineData("input2", "expected2")]
+    public void MethodName_WithVariousInputs_ReturnsExpected(string input, string expected)
+    {
+        // Test with multiple data sets
+    }
+}
+```
+
 ### Available Test Endpoints
 
 #### Database Tests

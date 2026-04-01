@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.1.11304.174 d18.0
+VisualStudioVersion = 18.1.11304.174
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgentApi", "RagAgentApi.csproj", "{1E38E2ED-7619-4C18-AE92-C63EABC0B160}"
 EndProject
@@ -11,6 +11,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documents", "Documents", "{
 	ProjectSection(SolutionItems) = preProject
 		Documentation\API_Endpoints.md = Documentation\API_Endpoints.md
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgentApi.Tests", "RagAgentApi.Tests\RagAgentApi.Tests.csproj", "{B451527E-1A7D-4E3E-B401-527C2AC52921}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -46,6 +48,18 @@ Global
 		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Release|x64.Build.0 = Release|Any CPU
 		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Release|x86.ActiveCfg = Release|Any CPU
 		{297C6B32-EEB4-8D03-BB7A-03BE78AA36CB}.Release|x86.Build.0 = Release|Any CPU
+		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Debug|x64.Build.0 = Debug|Any CPU
+		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Debug|x86.Build.0 = Debug|Any CPU
+		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Release|x64.ActiveCfg = Release|Any CPU
+		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Release|x64.Build.0 = Release|Any CPU
+		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Release|x86.ActiveCfg = Release|Any CPU
+		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
