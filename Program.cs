@@ -100,6 +100,17 @@ builder.Services.AddScoped<AgentSelectorService>();
 builder.Services.AddScoped<AgentFactory>();
 builder.Services.AddScoped<DatabaseSeedService>();
 
+// Retrieval Strategies
+builder.Services.Configure<RagAgentApi.Services.Retrieval.RetrievalSettings>(
+    builder.Configuration.GetSection("Retrieval"));
+builder.Services.AddScoped<RagAgentApi.Services.Retrieval.RagRetrievalStrategy>();
+builder.Services.AddScoped<RagAgentApi.Services.Retrieval.FileFirstRetrievalStrategy>();
+builder.Services.AddScoped<RagAgentApi.Services.Retrieval.AutoRetrievalStrategy>();
+builder.Services.AddScoped<RagAgentApi.Services.Retrieval.RetrievalStrategyFactory>();
+
+// Log retrieval mode at startup
+var retrievalMode = builder.Configuration.GetValue<string>("Retrieval:Mode", "Rag");
+
 // Error Logging Service
 builder.Services.AddScoped<IErrorLogService, ErrorLogService>();
 
@@ -279,6 +290,7 @@ _ = Task.Run(async () =>
 // Log application startup
 var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
 startupLogger.LogInformation("RAG Agent API starting up...");
+startupLogger.LogInformation("Retrieval strategy mode: {RetrievalMode}", retrievalMode);
 startupLogger.LogInformation("Swagger UI available at: {SwaggerUrl}",
     app.Environment.IsDevelopment() ? "https://localhost:7000" : "");
 

@@ -605,4 +605,36 @@ public class RagApiClient
             throw;
         }
     }
+
+    // Retrieval Configuration
+    public async Task<RetrievalConfigDto?> GetRetrievalConfigAsync()
+    {
+        try
+        {
+            _logger.LogInformation("[RagApiClient] Getting retrieval configuration");
+            var response = await _httpClient.GetAsync("/api/rag/retrieval-config");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<RetrievalConfigDto>(content, _jsonOptions);
+            }
+
+            _logger.LogWarning("[RagApiClient] Failed to get retrieval config: {Status}", response.StatusCode);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[RagApiClient] Error getting retrieval config");
+            return null;
+        }
+    }
+
+    public class RetrievalConfigDto
+    {
+        public string Mode { get; set; } = "Rag";
+        public int AutoModeDocumentThreshold { get; set; }
+        public int AutoModeContentSizeThresholdKb { get; set; }
+        public double MinimumRelevanceScore { get; set; }
+    }
 }

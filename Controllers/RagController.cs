@@ -4,6 +4,7 @@ using RagAgentApi.Models;
 using RagAgentApi.Models.Requests;
 using RagAgentApi.Agents;
 using RagAgentApi.Services;
+using RagAgentApi.Services.Retrieval;
 using RagAgentApi.Filters;
 using System.ComponentModel.DataAnnotations;
 
@@ -21,6 +22,7 @@ public class RagController : ControllerBase
     private readonly AgentOrchestrationService _orchestrationService;
     private readonly IAzureOpenAIService _openAIService;
     private readonly IAzureSearchService _searchService;
+    private readonly RetrievalStrategyFactory _retrievalStrategyFactory;
     private readonly ILogger<RagController> _logger;
     private readonly IConfiguration _configuration;
 
@@ -30,6 +32,7 @@ public class RagController : ControllerBase
         AgentOrchestrationService orchestrationService,
         IAzureOpenAIService openAIService,
         IAzureSearchService searchService,
+        RetrievalStrategyFactory retrievalStrategyFactory,
         ILogger<RagController> logger,
         IConfiguration configuration)
     {
@@ -38,6 +41,7 @@ public class RagController : ControllerBase
         _orchestrationService = orchestrationService;
         _openAIService = openAIService;
         _searchService = searchService;
+        _retrievalStrategyFactory = retrievalStrategyFactory;
         _logger = logger;
         _configuration = configuration;
     }
@@ -461,84 +465,38 @@ public class RagController : ControllerBase
 
             _logger.LogInformation("Processing query: '{Query}' with top-K {TopK}", request.Query, request.TopK);
 
-            // Get RAG mode configuration
-            var ragMode = _configuration.GetValue<string>("RagSettings:Mode", "hybrid")?.ToLower();
-            
-            // Get embedding for query
-            var queryEmbedding = await _openAIService.GetEmbeddingAsync(request.Query, cancellationToken);
-            
-            // Use PostgresQueryService for vector search
-            var postgresQueryService = HttpContext.RequestServices.GetRequiredService<PostgresQueryService>();
-            var searchResults = await postgresQueryService.SearchAsync(queryEmbedding, request.TopK, 0.5, cancellationToken);
+            // Get retrieval strategy from factory
+            var strategy = _retrievalStrategyFactory.GetStrategy();
+            _logger.LogInformation("Using retrieval strategy: {Strategy} (configured mode: {Mode})", 
+                strategy.Name, _retrievalStrategyFactory.ConfiguredMode);
 
-            string answer;
-            List<object> sources;
+            // Execute the retrieval strategy
+            var result = await strategy.ExecuteAsync(request.Query, request.TopK, cancellationToken);
 
-            if (!searchResults.Any())
+            if (!result.Success)
             {
-                _logger.LogWarning("[RagController] No documents found for query: '{Query}'", request.Query);
-                
-                if (ragMode == "strict")
-                {
-                    // Strict mode: error response
-                    answer = "Kontekstissa ei ole tietoa tähän kysymykseen. " +
-                            "Varmista että olet ensin ladannut dokumentteja järjestelmään käyttämällä 'Ingest Document' -toimintoa.";
-                    sources = new List<object>();
-                }
-                else
-                {
-                    // Hybrid mode: use general ChatGPT knowledge
-                    var systemPrompt = @"You are a helpful AI assistant. Answer the user's question based on your general knowledge.
-Be concise, accurate, and helpful. If you're not certain about something, clearly state your level of confidence.
-Provide practical and useful information.";
-                    
-                    answer = "?? Dokumenteista ei löytynyt tietoa. Vastaan yleisen tietämykseni perusteella:\n\n" +
-                            await _openAIService.GetChatCompletionAsync(systemPrompt, request.Query, cancellationToken);
-                    
-                    sources = new List<object>();
-                    
-                    _logger.LogInformation("[RagController] Generated answer using general knowledge (no context)");
-                }
-            }
-            else
-            {
-                // Documents found - use RAG
-                var context = string.Join("\n\n", searchResults.Select(r => r.Content));
-                
-                var systemPrompt = @"You are a helpful AI assistant that answers questions based ONLY on the provided context.
-
-IMPORTANT RULES:
-- Answer ONLY using information from the context below
-- If the context doesn't contain the answer, clearly state that you don't have that information
-- Do NOT use your general knowledge to answer questions
-- Be concise and cite specific parts of the context when relevant
-
-Context:
-" + context;
-
-                answer = "?? Vastaus dokumenttien perusteella:\n\n" +
-                        await _openAIService.GetChatCompletionAsync(systemPrompt, request.Query, cancellationToken);
-                
-                sources = searchResults.Select(r => new
-                {
-                    url = r.SourceUrl ?? "",
-                    content = r.Content.Length > 200 ? r.Content.Substring(0, 200) + "..." : r.Content,
-                    relevanceScore = Math.Round(r.RelevanceScore, 3)
-                }).ToList<object>();
-                
-                _logger.LogInformation("[RagController] Generated answer with {SourceCount} sources", sources.Count);
+                _logger.LogError("Retrieval failed: {Error}", result.ErrorMessage);
+                return StatusCode(500, CreateErrorResponse(result.ErrorMessage ?? "Query failed"));
             }
 
             var response = new
             {
                 query = request.Query,
-                answer = answer,
-                sources = sources,
-                source_count = sources.Count,
-                processing_time_ms = 0 // Would need stopwatch
+                answer = result.Answer,
+                sources = result.Sources.Select(s => new
+                {
+                    url = s.Url,
+                    content = s.Content,
+                    relevanceScore = s.RelevanceScore
+                }),
+                source_count = result.Sources.Count,
+                processing_time_ms = result.ProcessingTimeMs,
+                retrieval_mode = result.ConfiguredMode,
+                strategy_used = result.StrategyUsed,
+                metadata = result.Metadata
             };
 
-            _logger.LogInformation("Query processed successfully");
+            _logger.LogInformation("Query processed successfully using {Strategy} strategy", result.StrategyUsed);
             return Ok(response);
         }
         catch (Exception ex)
@@ -546,6 +504,24 @@ Context:
             _logger.LogError(ex, "Unexpected error during query processing");
             return StatusCode(500, CreateErrorResponse("An unexpected error occurred during query processing"));
         }
+    }
+
+    /// <summary>
+    /// Get current retrieval configuration
+    /// </summary>
+    [HttpGet("retrieval-config")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public IActionResult GetRetrievalConfig()
+    {
+        var config = new
+        {
+            mode = _retrievalStrategyFactory.ConfiguredMode,
+            autoModeDocumentThreshold = _configuration.GetValue<int>("Retrieval:AutoModeDocumentThreshold", 10),
+            autoModeContentSizeThresholdKb = _configuration.GetValue<int>("Retrieval:AutoModeContentSizeThresholdKb", 500),
+            minimumRelevanceScore = _configuration.GetValue<double>("Retrieval:MinimumRelevanceScore", 0.5)
+        };
+
+        return Ok(config);
     }
 
     /// <summary>

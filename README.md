@@ -123,6 +123,7 @@ At the final stage, the system compiles the aggregated context into a unified re
 - ✅ **Similar Query Detection**: Find related past queries using vector similarity
 - ✅ **Agent Pipeline Orchestration**: Sequential agent execution with error handling
 - ✅ **Enhanced API Endpoints**: Both legacy and enhanced processing modes
+- ✅ **Retrieval Strategies**: Configurable Rag/FileFirst/Auto modes with strategy pattern
 
 ### Quality & Reliability
 - ✅ **Production Ready**: Error handling, retries, and graceful degradation
@@ -216,6 +217,101 @@ The API supports two operational modes for handling queries without document con
     "DefaultChunkSize": 1000
   }
 }
+```
+
+### Retrieval Strategies
+
+The API supports three **retrieval strategies** that determine how documents are fetched and used to answer queries. This is configured separately from RAG Modes and controls the document retrieval mechanism.
+
+#### Strategy Pattern Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  RetrievalStrategyFactory                   │
+│         (Reads config and returns correct strategy)         │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
+   ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+   │     Rag      │ │  FileFirst   │ │     Auto     │
+   │   Strategy   │ │   Strategy   │ │   Strategy   │
+   └──────────────┘ └──────────────┘ └──────────────┘
+   │ Vector search │ │ Load all docs│ │ Selects Rag  │
+   │ via pgvector  │ │ from database│ │ or FileFirst │
+   └───────────────┘ └──────────────┘ └──────────────┘
+```
+
+#### Available Strategies
+
+| Strategy | Description | Best For |
+|----------|-------------|----------|
+| **Rag** | Uses vector similarity search (pgvector) to find relevant document chunks | Large document collections, semantic search |
+| **FileFirst** | Loads all documents directly from the database | Small collections (≤10 docs, ≤500KB total) |
+| **Auto** | Automatically selects between Rag and FileFirst based on document count and size | Mixed workloads, automatic optimization |
+
+#### Rag Strategy (Default)
+- Generates embedding for the query using Azure OpenAI
+- Performs cosine similarity search against document chunks
+- Returns only the most relevant chunks as context
+- **Pros**: Efficient for large collections, semantic understanding
+- **Cons**: May miss context if chunks are too small
+
+#### FileFirst Strategy
+- Loads all active documents and their chunks from PostgreSQL
+- Provides complete document context to the LLM
+- **Pros**: Complete context, no relevance filtering
+- **Cons**: Token limit issues with large collections
+
+#### Auto Strategy
+- Checks document count and total content size
+- If documents ≤ threshold AND content size ≤ threshold → **FileFirst**
+- Otherwise → **Rag**
+- **Pros**: Best of both worlds, adapts to data size
+- **Cons**: Slight overhead from size calculation
+
+#### Configuration
+
+```json
+{
+  "Retrieval": {
+    "Mode": "Rag",                        // "Rag", "FileFirst", or "Auto"
+    "AutoModeDocumentThreshold": 10,      // Max docs for FileFirst in Auto mode
+    "AutoModeContentSizeThresholdKb": 500, // Max content size (KB) for FileFirst
+    "MinimumRelevanceScore": 0.5          // Min similarity score for Rag results
+  }
+}
+```
+
+#### UI Indicator
+
+The Blazor UI displays the current retrieval mode in the header:
+- 🔍 **RAG** - Vector similarity search active
+- 📁 **FileFirst** - Direct document loading active
+- 🔄 **Auto** - Automatic strategy selection
+
+#### API Endpoint
+
+Get current retrieval configuration:
+```bash
+curl https://localhost:7000/api/rag/retrieval-config
+```
+
+Response:
+```json
+{
+  "mode": "Auto",
+  "autoModeDocumentThreshold": 10,
+  "autoModeContentSizeThresholdKb": 500,
+  "minimumRelevanceScore": 0.5
+}
+```
+
+#### Startup Logging
+
+When the application starts, it logs the selected retrieval strategy:
+```
+[RetrievalStrategy] Configured retrieval mode: Auto
 ```
 
 ## 🚀 Getting Started

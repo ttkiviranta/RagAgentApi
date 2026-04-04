@@ -55,6 +55,13 @@
     "MinimumSearchScore": 0.5
   },
 
+  "Retrieval": {
+    "Mode": "Rag",
+    "AutoModeDocumentThreshold": 10,
+    "AutoModeContentSizeThresholdKb": 500,
+    "MinimumRelevanceScore": 0.5
+  },
+
   "DemoSettings": {
     "DataSource": "local",
     "LocalDataPath": "demos/",

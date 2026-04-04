@@ -43,18 +43,26 @@
   },
   
   "RagSettings": {
+    "Mode": "hybrid",
     "DefaultChunkSize": 1000,
     "DefaultChunkOverlap": 200,
     "MinChunkSize": 100,
     "MaxChunkSize": 5000,
-         "DefaultTopK": 5,
-         "MaxTopK": 50,
-         "BatchSize": 100,
-         "VectorDimensions": 1536,
-         "MinimumSearchScore": 0.5
-       },
+    "DefaultTopK": 5,
+    "MaxTopK": 50,
+    "BatchSize": 100,
+    "VectorDimensions": 1536,
+    "MinimumSearchScore": 0.5
+  },
 
-      "NotificationConfigs": [
+  "Retrieval": {
+    "Mode": "Rag",
+    "AutoModeDocumentThreshold": 10,
+    "AutoModeContentSizeThresholdKb": 500,
+    "MinimumRelevanceScore": 0.5
+  },
+
+  "NotificationConfigs":
         {
           "Channel": "email",
           "Enabled": false,
