@@ -69,7 +69,7 @@ This updated Orchestrator Agent Internal Logic diagram illustrates how the orche
 
 All paths converge at Azure OpenAI, where the LLM generates the final response.
 
-![OrchestratorAgent Internal Logic](images/orchestrator-agent-logic-final.png)
+![OrchestratorAgent Internal Logic](docs/images/orchestrator-agent-logic-final.png)
 
 ## 🔍 Query Pipeline
 
