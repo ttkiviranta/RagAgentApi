@@ -55,17 +55,15 @@ This updated ingestion pipeline diagram illustrates the complete data ingestion 
 
 ![Ingestion Pipeline](docs/images/ingestion-pipeline-upd.png)
 
-## 🧠 OrchestratorAgent Logic
+## 🧠 OrchestratorAgent Internal Logic
 
-This diagram illustrates the internal decision-making and execution flow of the OrchestratorAgent.
+This updated OrchestratorAgent Internal Logic diagram illustrates how the orchestrator analyzes incoming requests and selects the appropriate processing path. The logic supports three main branches:
+- Query Requests: The orchestrator selects the Query Agent, performs semantic search, retrieves relevant chunks, and prepares context for the LLM.
+- Ingestion Requests: The orchestrator processes and stores incoming data through the ingestion pipeline.
+- File‑First Requests: For small files or simple retrievals, the orchestrator reads the file directly, extracts content, and sends it to the LLM without chunking or vector search.
+All paths converge at Azure OpenAI, where the LLM generates the final response returned to the user.
 
-The process begins by analyzing the input context and selecting the appropriate agent types.
-A dynamic pipeline is then built based on the selected agents.
-Each agent is executed sequentially, with context updates and error checks at every step.
-All execution metrics, statuses, and telemetry logs are recorded for monitoring and visualization.
-Finally, the OrchestratorAgent compiles the results and returns a unified output.
-
-![OrchestratorAgent Logic](docs/images/orchestrator-agent-logic.png)
+![OrchestratorAgent Internal Logic](docs/images/orchestrator-agent-logic-upd.png)
 
 ## 🔍 Query Pipeline
 
