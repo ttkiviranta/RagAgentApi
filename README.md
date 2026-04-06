@@ -52,13 +52,12 @@ The UI continues to display the active retrieval mode, ensuring transparency for
 
 ## 🔄 Ingestion Pipeline
 
-This updated ingestion pipeline diagram illustrates the complete data ingestion process. It shows how files and queries are received, parsed, chunked, embedded, and stored in the vector database. The pipeline consists of four main stages:
-- Input & Upload: File uploads and data queries are received.
-- Processing Layer: Data is parsed, extracted, chunked, embedded, and managed for storage.
-- Vector Database: PostgreSQL + pgvector stores vector embeddings, document indexes, and conversation logs.
-- Completion Stage: Confirms successful ingestion and logs the operation.
+Update Ingestion Pipeline diagram as follows:
+The ingestion pipeline now shows the full data processing flow:
+– Input files are ingested through the 'Ingestion Process' where they undergo preprocessing.
+– Metadata including BlobUri, BlobName, Hash, and Size is added during the upload step to Azure Blob Storage.
 
-![Ingestion Pipeline](docs/images/ingestion-pipeline-upd.png)
+![Ingestion Pipeline](docs/images/ingestion-pipeline-final.png)
 
 ## 🧠 OrchestratorAgent Internal Logic
 
