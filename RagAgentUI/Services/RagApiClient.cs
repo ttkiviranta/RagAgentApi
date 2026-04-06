@@ -107,6 +107,58 @@ public class RagApiClient
     }
 
     /// <summary>
+    /// Upload a file with blob storage support
+    /// </summary>
+    public async Task<FileUploadResponse?> UploadFileAsync(
+        Stream fileStream, 
+        string fileName, 
+        string contentType,
+        int chunkSize = 1000,
+        int chunkOverlap = 200,
+        bool storeOriginalFile = true,
+        string? title = null)
+    {
+        try
+        {
+            _logger.LogInformation("[RagApiClient] Uploading file: {FileName}, Size: {Size}, StoreBlob: {StoreBlob}", 
+                fileName, fileStream.Length, storeOriginalFile);
+
+            using var content = new MultipartFormDataContent();
+            using var fileContent = new StreamContent(fileStream);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+            content.Add(fileContent, "file", fileName);
+
+            var queryParams = $"?chunkSize={chunkSize}&chunkOverlap={chunkOverlap}&storeOriginalFile={storeOriginalFile}";
+            if (!string.IsNullOrEmpty(title))
+            {
+                queryParams += $"&title={Uri.EscapeDataString(title)}";
+            }
+
+            var response = await _httpClient.PostAsync($"/api/rag/upload-file{queryParams}", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("[RagApiClient] File upload failed: {Status} - {Error}", response.StatusCode, errorContent);
+                return null;
+            }
+
+            var responseContent = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<FileUploadResponse>(responseContent, _jsonOptions);
+
+            _logger.LogInformation("[RagApiClient] File uploaded successfully: {FileName}, BlobStored: {BlobStored}", 
+                fileName, result?.StoredInBlobStorage ?? false);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[RagApiClient] Error uploading file: {FileName}", fileName);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Check if a document with the given URL already exists
     /// </summary>
     public async Task<DocumentUrlCheckResult> CheckDocumentUrlExistsAsync(string url)

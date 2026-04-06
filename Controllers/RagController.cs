@@ -318,6 +318,263 @@ public class RagController : ControllerBase
     }
 
     /// <summary>
+    /// Upload a file with original storage in Azure Blob Storage
+    /// </summary>
+    /// <param name="file">The file to upload</param>
+    /// <param name="chunkSize">Size of text chunks (100-5000)</param>
+    /// <param name="chunkOverlap">Overlap between chunks (0-2500)</param>
+    /// <param name="storeOriginalFile">Whether to store original file in Blob Storage</param>
+    /// <param name="title">Custom document title (optional)</param>
+    /// <returns>Upload result with blob storage information</returns>
+    [HttpPost("upload-file")]
+    [ProducesResponseType(typeof(FileUploadResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
+    [RequestSizeLimit(100 * 1024 * 1024)] // 100MB limit
+    public async Task<IActionResult> UploadFile(
+        IFormFile file,
+        [FromQuery] int chunkSize = 1000,
+        [FromQuery] int chunkOverlap = 200,
+        [FromQuery] bool storeOriginalFile = true,
+        [FromQuery] string? title = null,
+        CancellationToken cancellationToken = default)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            // Validate file
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(CreateErrorResponse("No file provided or file is empty"));
+            }
+
+            var allowedTypes = new[] { "application/pdf", "text/plain", "text/markdown", "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
+
+            if (!allowedTypes.Contains(file.ContentType.ToLowerInvariant()) && 
+                !file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) &&
+                !file.FileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) &&
+                !file.FileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(CreateErrorResponse($"Unsupported file type: {file.ContentType}. Allowed: PDF, TXT, MD, DOC, DOCX"));
+            }
+
+            var threadId = Guid.NewGuid();
+            var documentId = Guid.NewGuid();
+            var documentTitle = title ?? Path.GetFileNameWithoutExtension(file.FileName);
+            var documentUrl = $"blob://{documentId:N}/{file.FileName}";
+
+            _logger.LogInformation("[UploadFile] Starting upload: {FileName}, Size: {Size} bytes, ThreadId: {ThreadId}",
+                file.FileName, file.Length, threadId);
+
+            // Get services
+            var blobService = HttpContext.RequestServices.GetService<IBlobStorageService>();
+            var chunkerAgent = HttpContext.RequestServices.GetRequiredService<ChunkerAgent>();
+            var embeddingAgent = HttpContext.RequestServices.GetRequiredService<EmbeddingAgent>();
+            var storageAgent = HttpContext.RequestServices.GetRequiredService<PostgresStorageAgent>();
+
+            BlobUploadResult? blobResult = null;
+
+            // Step 1: Upload original file to Blob Storage (if enabled)
+            if (storeOriginalFile && blobService?.IsEnabled == true)
+            {
+                using var fileStream = file.OpenReadStream();
+                blobResult = await blobService.UploadFileAsync(
+                    fileStream,
+                    file.FileName,
+                    file.ContentType,
+                    documentId,
+                    cancellationToken);
+
+                if (!blobResult.Success)
+                {
+                    _logger.LogWarning("[UploadFile] Blob upload failed: {Error}, continuing without blob storage", blobResult.ErrorMessage);
+                }
+                else
+                {
+                    _logger.LogInformation("[UploadFile] Blob upload successful: {BlobUri}", blobResult.BlobUri);
+                }
+            }
+
+            // Step 2: Extract text content from file
+            string textContent;
+            using (var stream = file.OpenReadStream())
+            {
+                textContent = await ExtractTextFromFileAsync(stream, file.FileName, file.ContentType, cancellationToken);
+            }
+
+            if (string.IsNullOrWhiteSpace(textContent))
+            {
+                return BadRequest(CreateErrorResponse("Could not extract text content from file"));
+            }
+
+            // Step 3: Chunk the content
+            var chunkContext = new AgentContext
+            {
+                ThreadId = threadId.ToString(),
+                State = new Dictionary<string, object>
+                {
+                    { "raw_content", textContent },
+                    { "url", documentUrl },
+                    { "chunk_size", chunkSize },
+                    { "chunk_overlap", chunkOverlap },
+                    { "title", documentTitle },
+                    { "source", "file-upload" },
+                    { "document_id", documentId }
+                }
+            };
+
+            // Add blob metadata to context
+            if (blobResult?.Success == true)
+            {
+                chunkContext.State["blob_uri"] = blobResult.BlobUri!;
+                chunkContext.State["blob_name"] = blobResult.BlobName!;
+                chunkContext.State["blob_container"] = blobResult.ContainerName!;
+                chunkContext.State["original_file_hash"] = blobResult.FileHash!;
+                chunkContext.State["original_file_size"] = blobResult.FileSizeBytes;
+                chunkContext.State["original_file_name"] = file.FileName;
+                chunkContext.State["mime_type"] = file.ContentType;
+                chunkContext.State["blob_uploaded_at"] = blobResult.UploadedAt!;
+            }
+
+            var chunkResult = await chunkerAgent.ExecuteAsync(chunkContext, cancellationToken);
+            if (!chunkResult.Success)
+            {
+                return StatusCode(500, CreateErrorResponse($"Chunking failed: {chunkResult.Message}"));
+            }
+
+            // Step 4: Generate embeddings
+            var embeddingContext = new AgentContext
+            {
+                ThreadId = threadId.ToString(),
+                State = chunkContext.State
+            };
+
+            var embeddingResult = await embeddingAgent.ExecuteAsync(embeddingContext, cancellationToken);
+            if (!embeddingResult.Success)
+            {
+                return StatusCode(500, CreateErrorResponse($"Embedding failed: {embeddingResult.Message}"));
+            }
+
+            // Step 5: Store in PostgreSQL
+            var storageContext = new AgentContext
+            {
+                ThreadId = threadId.ToString(),
+                State = embeddingContext.State
+            };
+
+            var storageResult = await storageAgent.ExecuteAsync(storageContext, cancellationToken);
+            if (!storageResult.Success)
+            {
+                return StatusCode(500, CreateErrorResponse($"Storage failed: {storageResult.Message}"));
+            }
+
+            stopwatch.Stop();
+
+            var chunksProcessed = (int)(embeddingContext.State.GetValueOrDefault("chunk_count", 0) ?? 0);
+
+            var response = new FileUploadResponse
+            {
+                ThreadId = threadId,
+                DocumentId = documentId,
+                Status = "success",
+                Message = "File uploaded and processed successfully",
+                FileName = file.FileName,
+                FileSizeBytes = file.Length,
+                MimeType = file.ContentType,
+                StoredInBlobStorage = blobResult?.Success ?? false,
+                BlobUri = blobResult?.BlobUri,
+                FileHash = blobResult?.FileHash,
+                ChunksProcessed = chunksProcessed,
+                ExecutionTimeMs = (int)stopwatch.ElapsedMilliseconds,
+                RetrievalMode = blobResult?.Success == true ? "FileFirst" : "Rag"
+            };
+
+            _logger.LogInformation("[UploadFile] Completed: {FileName}, Chunks: {Chunks}, BlobStored: {BlobStored}, Time: {Time}ms",
+                file.FileName, chunksProcessed, blobResult?.Success ?? false, stopwatch.ElapsedMilliseconds);
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[UploadFile] Failed to process file upload");
+            return StatusCode(500, CreateErrorResponse($"File upload failed: {ex.Message}"));
+        }
+    }
+
+    /// <summary>
+    /// Extract text content from various file types
+    /// </summary>
+    private async Task<string> ExtractTextFromFileAsync(Stream stream, string fileName, string contentType, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // For text files, read directly
+            if (contentType == "text/plain" || fileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) ||
+                fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            {
+                using var reader = new StreamReader(stream);
+                return await reader.ReadToEndAsync(cancellationToken);
+            }
+
+            // For PDF files, use iText (if available) or Azure Document Intelligence
+            if (contentType == "application/pdf" || fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                // Try to use Azure Document Intelligence if configured
+                var docIntelligence = HttpContext.RequestServices.GetService<IAzureDocumentIntelligenceService>();
+                if (docIntelligence != null)
+                {
+                    var result = await docIntelligence.ExtractTextAsync(stream, cancellationToken);
+                    if (!string.IsNullOrEmpty(result))
+                        return result;
+                }
+
+                // Fallback: read raw bytes and try basic extraction
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms, cancellationToken);
+                return ExtractTextFromPdfBytes(ms.ToArray());
+            }
+
+            // Default: try to read as text
+            using var defaultReader = new StreamReader(stream);
+            return await defaultReader.ReadToEndAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[UploadFile] Text extraction failed for {FileName}", fileName);
+            return string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Basic PDF text extraction (placeholder - should be enhanced with proper PDF library)
+    /// </summary>
+    private string ExtractTextFromPdfBytes(byte[] pdfBytes)
+    {
+        try
+        {
+            // This is a simplified extraction - in production, use iText or similar
+            using var pdfDoc = new iText.Kernel.Pdf.PdfDocument(
+                new iText.Kernel.Pdf.PdfReader(new MemoryStream(pdfBytes)));
+
+            var text = new System.Text.StringBuilder();
+            for (int i = 1; i <= pdfDoc.GetNumberOfPages(); i++)
+            {
+                var page = pdfDoc.GetPage(i);
+                var pageText = iText.Kernel.Pdf.Canvas.Parser.PdfTextExtractor.GetTextFromPage(page);
+                text.AppendLine(pageText);
+            }
+            return text.ToString();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "PDF extraction failed, returning placeholder");
+            return $"[PDF content - {pdfBytes.Length} bytes]";
+        }
+    }
+
+    /// <summary>
     /// Ingest raw text content directly (e.g., from file uploads)
     /// </summary>
     /// <param name="request">Request containing raw text content</param>

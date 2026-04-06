@@ -100,6 +100,11 @@ builder.Services.AddScoped<AgentSelectorService>();
 builder.Services.AddScoped<AgentFactory>();
 builder.Services.AddScoped<DatabaseSeedService>();
 
+// Azure Blob Storage
+builder.Services.Configure<RagAgentApi.Services.BlobStorageSettings>(
+    builder.Configuration.GetSection("BlobStorage"));
+builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
+
 // Retrieval Strategies
 builder.Services.Configure<RagAgentApi.Services.Retrieval.RetrievalSettings>(
     builder.Configuration.GetSection("Retrieval"));
@@ -108,8 +113,9 @@ builder.Services.AddScoped<RagAgentApi.Services.Retrieval.FileFirstRetrievalStra
 builder.Services.AddScoped<RagAgentApi.Services.Retrieval.AutoRetrievalStrategy>();
 builder.Services.AddScoped<RagAgentApi.Services.Retrieval.RetrievalStrategyFactory>();
 
-// Log retrieval mode at startup
+// Log retrieval mode and blob storage at startup
 var retrievalMode = builder.Configuration.GetValue<string>("Retrieval:Mode", "Rag");
+var blobStorageEnabled = builder.Configuration.GetValue<bool>("BlobStorage:Enabled", false);
 
 // Error Logging Service
 builder.Services.AddScoped<IErrorLogService, ErrorLogService>();
@@ -291,6 +297,7 @@ _ = Task.Run(async () =>
 var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
 startupLogger.LogInformation("RAG Agent API starting up...");
 startupLogger.LogInformation("Retrieval strategy mode: {RetrievalMode}", retrievalMode);
+startupLogger.LogInformation("Blob storage enabled: {BlobStorageEnabled}", blobStorageEnabled);
 startupLogger.LogInformation("Swagger UI available at: {SwaggerUrl}",
     app.Environment.IsDevelopment() ? "https://localhost:7000" : "");
 

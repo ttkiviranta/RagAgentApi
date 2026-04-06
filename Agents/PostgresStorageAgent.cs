@@ -192,6 +192,29 @@ ContentHash = contentHash,
                 Metadata = JsonDocument.Parse(JsonSerializer.Serialize(metadata))
             };
 
+            // Add blob storage metadata if available
+            if (context.State.TryGetValue("blob_uri", out var blobUri) && blobUri is string blobUriStr)
+            {
+                newDocument.BlobUri = blobUriStr;
+                newDocument.BlobName = context.State.GetValueOrDefault("blob_name", null) as string;
+                newDocument.BlobContainer = context.State.GetValueOrDefault("blob_container", null) as string;
+                newDocument.OriginalFileName = context.State.GetValueOrDefault("original_file_name", null) as string;
+                newDocument.MimeType = context.State.GetValueOrDefault("mime_type", null) as string;
+                newDocument.OriginalFileHash = context.State.GetValueOrDefault("original_file_hash", null) as string;
+
+                if (context.State.TryGetValue("original_file_size", out var fileSizeObj) && fileSizeObj is long fileSize)
+                {
+                    newDocument.OriginalFileSizeBytes = fileSize;
+                }
+
+                if (context.State.TryGetValue("blob_uploaded_at", out var uploadedAtObj) && uploadedAtObj is DateTime uploadedAt)
+                {
+                    newDocument.BlobUploadedAt = uploadedAt;
+                }
+
+                _logger.LogInformation("[PostgresStorageAgent] Added blob metadata: {BlobUri}", blobUriStr);
+            }
+
  _context.Documents.Add(newDocument);
             return newDocument;
  }

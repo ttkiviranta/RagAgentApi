@@ -55,4 +55,9 @@ public class RetrievalSource
     public string Content { get; set; } = string.Empty;
     public double RelevanceScore { get; set; }
     public string? Title { get; set; }
+
+    /// <summary>
+    /// Additional metadata about the source (e.g., blob info, file size)
+    /// </summary>
+    public Dictionary<string, object> Metadata { get; set; } = new();
 }
