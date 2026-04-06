@@ -38,9 +38,12 @@ The API implements an **enhanced multi-agent architecture** where specialized ag
 
 ## 🧱 Architecture Overview
 
-This diagram shows the full system architecture across five layers: the Blazor UI, the .NET API, the multi‑agent layer, the PostgreSQL + pgvector vector database, and the Azure OpenAI LLM layer.
+This updated architecture diagram illustrates the complete retrieval system, now including the new File‑First and Auto modes. The API layer supports three retrieval strategies: RAG, File‑First, and Auto. The Auto mode automatically selects the appropriate strategy based on file size and count. The diagram shows both pipelines:
+- The RAG pipeline (Scraper, Chunker, Embedding, Query Agents, and PostgreSQL + pgvector)
+- The File‑First path (File Reader → Direct to LLM)
+The UI now displays which retrieval mode is active, ensuring transparency for end users.
 
-![Architecture Overview](docs/images/architecture-overview.png)
+![Architecture Overview](images/architecture-overview-upd.png)
 
 ## 🔄 Ingestion Pipeline
 
