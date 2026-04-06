@@ -69,15 +69,13 @@ Finally, the OrchestratorAgent compiles the results and returns a unified output
 
 ## 🔍 Query Pipeline
 
-This diagram illustrates the flow of a user query through the multi-agent system.
+This updated Query Pipeline diagram illustrates the complete retrieval flow, including support for RAG, File‑First, and Auto modes. The Orchestrator Agent determines the retrieval strategy based on user selection or automatic decision logic.
+- In File‑First mode, small files are processed directly through the File Reader and sent to the LLM without chunking or vector search.
+- In RAG mode, the system performs semantic search, retrieves relevant documents from the vector database, and uses the Query Agent to prepare context for the LLM.
+- In Auto mode, the system automatically selects the appropriate path based on file size and count.
+Both paths converge at Azure OpenAI, which generates the final LLM response.
 
-The process begins when a user submits a question.
-The OrchestratorAgent analyzes the query and selects the appropriate agent(s) to handle it.
-Typically, the QueryAgent performs a semantic search against the vector database to retrieve relevant documents.
-These documents are then passed to Azure OpenAI, which uses a large language model (GPT-3.5 or GPT-4) to generate a context-aware response.
-Finally, the system returns the answer to the user.
-
-![Query Pipeline](docs/images/query-pipeline.png)
+![Query Pipeline](docs/images/query-pipeline-upd.png)
 
 ## 🔁 A2A Pipeline
 
