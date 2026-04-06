@@ -43,7 +43,7 @@ This updated architecture diagram illustrates the complete retrieval system, now
 - The File‑First path (File Reader → Direct to LLM)
 The UI now displays which retrieval mode is active, ensuring transparency for end users.
 
-![Architecture Overview](images/architecture-overview-upd.png)
+![Architecture Overview](docs/images/architecture-overview-upd.png)
 
 ## 🔄 Ingestion Pipeline
 
