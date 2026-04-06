@@ -72,13 +72,17 @@ All paths converge at Azure OpenAI, where the LLM generates the final response r
 
 ## 🔍 Query Pipeline
 
-This updated Query Pipeline diagram illustrates the complete retrieval flow, including support for RAG, File‑First, and Auto modes. The Orchestrator Agent determines the retrieval strategy based on user selection or automatic decision logic.
-- In File‑First mode, small files are processed directly through the File Reader and sent to the LLM without chunking or vector search.
-- In RAG mode, the system performs semantic search, retrieves relevant documents from the vector database, and uses the Query Agent to prepare context for the LLM.
-- In Auto mode, the system automatically selects the appropriate path based on file size and count.
-Both paths converge at Azure OpenAI, which generates the final LLM response.
+This updated Query Pipeline diagram reflects the new Blob‑based File‑First retrieval logic.
+The orchestrator now supports three retrieval strategies: RAG, File‑First, and Auto.
+The Auto mode selects the optimal path based on Blob existence and file characteristics.
 
-![Query Pipeline](docs/images/query-pipeline-upd.png)
+The diagram shows both retrieval pipelines:
+– The File‑First path (Blob Storage → Download Blob → Extract → Direct to LLM), optimized for cases where the file already exists in Blob Storage.
+– The RAG pipeline (Chunker Agent, Embedding Agent, Query Agent, Vector DB, and context construction), used when no Blob exists or when the file is large.
+
+Both paths converge at Azure OpenAI, where the LLM generates the final response.
+
+![Query Pipeline](docs/images/query-pipeline-final.png)
 
 ## 🔁 A2A Pipeline
 
