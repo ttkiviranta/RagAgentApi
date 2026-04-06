@@ -38,12 +38,17 @@ The API implements an **enhanced multi-agent architecture** where specialized ag
 
 ## 🧱 Architecture Overview
 
-This updated architecture diagram illustrates the complete retrieval system, now including the new File‑First and Auto modes. The API layer supports three retrieval strategies: RAG, File‑First, and Auto. The Auto mode automatically selects the appropriate strategy based on file size and count. The diagram shows both pipelines:
-- The RAG pipeline (Scraper, Chunker, Embedding, Query Agents, and PostgreSQL + pgvector)
-- The File‑First path (File Reader → Direct to LLM)
-The UI now displays which retrieval mode is active, ensuring transparency for end users.
+This updated architecture diagram reflects the new Blob‑based File‑First retrieval logic.
+The API layer now supports three retrieval strategies: RAG, File‑First, and Auto.
+The Auto mode selects the optimal path based on Blob existence and file characteristics.
 
-![Architecture Overview](docs/images/architecture-overview-upd.png)
+The diagram shows both retrieval pipelines:
+– The File‑First path (Blob Storage → Download Blob → Extract → Direct to LLM), including metadata such as BlobUri, BlobName, Hash, and Size.
+– The RAG pipeline (Chunker, Embedding, Query Agents, Vector DB, and context construction).
+
+The UI continues to display the active retrieval mode, ensuring transparency for end users.
+
+![Architecture Overview](docs/images/architecture-overview-final.png)
 
 ## 🔄 Ingestion Pipeline
 
