@@ -47,9 +47,13 @@ The UI now displays which retrieval mode is active, ensuring transparency for en
 
 ## 🔄 Ingestion Pipeline
 
-This diagram highlights the ingestion flow step by step: Scraper → Chunker → Embedding → Storage → Embedding model.
+This updated ingestion pipeline diagram illustrates the complete data ingestion process. It shows how files and queries are received, parsed, chunked, embedded, and stored in the vector database. The pipeline consists of four main stages:
+- Input & Upload: File uploads and data queries are received.
+- Processing Layer: Data is parsed, extracted, chunked, embedded, and managed for storage.
+- Vector Database: PostgreSQL + pgvector stores vector embeddings, document indexes, and conversation logs.
+- Completion Stage: Confirms successful ingestion and logs the operation.
 
-![Ingestion Pipeline](docs/images/ingestion-pipeline.png)
+![Ingestion Pipeline](docs/images/ingestion-pipeline-upd.png)
 
 ## 🧠 OrchestratorAgent Logic
 
