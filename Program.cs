@@ -92,6 +92,7 @@ builder.Services.AddSingleton<IPlaywrightScraperService, PlaywrightScraperServic
 // Azure Services - Singleton for connection reuse
 builder.Services.AddSingleton<IAzureOpenAIService, AzureOpenAIService>();
 builder.Services.AddSingleton<IAzureSearchService, AzureSearchService>();
+builder.Services.AddSingleton<IAzureDocumentIntelligenceService, AzureDocumentIntelligenceService>();
 
 // PostgreSQL Services
 builder.Services.AddScoped<PostgresQueryService>();

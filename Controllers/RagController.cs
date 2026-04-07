@@ -518,22 +518,42 @@ public class RagController : ControllerBase
                 return await reader.ReadToEndAsync(cancellationToken);
             }
 
-            // For PDF files, use iText (if available) or Azure Document Intelligence
+            // For PDF files, use Azure Document Intelligence or iText fallback
             if (contentType == "application/pdf" || fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
             {
-                // Try to use Azure Document Intelligence if configured
+                // Copy stream to MemoryStream for reusability (original stream may not support seeking)
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms, cancellationToken);
+                var pdfBytes = ms.ToArray();
+
+                _logger.LogDebug("[UploadFile] Processing PDF: {FileName}, {Size} bytes", fileName, pdfBytes.Length);
+
+                // Try to use Azure Document Intelligence if configured (best for scanned/OCR PDFs)
                 var docIntelligence = HttpContext.RequestServices.GetService<IAzureDocumentIntelligenceService>();
                 if (docIntelligence != null)
                 {
-                    var result = await docIntelligence.ExtractTextAsync(stream, cancellationToken);
+                    using var diStream = new MemoryStream(pdfBytes);
+                    var result = await docIntelligence.ExtractTextAsync(diStream, cancellationToken);
                     if (!string.IsNullOrEmpty(result))
+                    {
+                        _logger.LogInformation("[UploadFile] Document Intelligence extracted {Length} chars from {FileName}", 
+                            result.Length, fileName);
                         return result;
+                    }
+                    _logger.LogWarning("[UploadFile] Document Intelligence returned empty for {FileName}, trying iText fallback", fileName);
                 }
 
-                // Fallback: read raw bytes and try basic extraction
-                using var ms = new MemoryStream();
-                await stream.CopyToAsync(ms, cancellationToken);
-                return ExtractTextFromPdfBytes(ms.ToArray());
+                // Fallback: use iText for text-based PDFs
+                var iTextResult = ExtractTextFromPdfBytes(pdfBytes);
+                if (!string.IsNullOrEmpty(iTextResult) && !iTextResult.StartsWith("[PDF content"))
+                {
+                    _logger.LogInformation("[UploadFile] iText extracted {Length} chars from {FileName}", 
+                        iTextResult.Length, fileName);
+                    return iTextResult;
+                }
+
+                _logger.LogWarning("[UploadFile] Both Document Intelligence and iText failed for {FileName}", fileName);
+                return string.Empty;
             }
 
             // Default: try to read as text

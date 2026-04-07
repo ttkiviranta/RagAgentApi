@@ -2,9 +2,6 @@
 @using RagAgentUI.Services
 @using RagAgentUI.Models
 @using System.IO
-@using System.Text
-@using iText.Kernel.Pdf
-@using iText.Kernel.Pdf.Canvas.Parser
 @inject RagApiClient ApiClient
 @inject ILogger<FileUploadIngest> Logger
 
@@ -204,43 +201,43 @@
 
     private async Task ProcessFileIngestion()
     {
-        progressMessage = "Luetaan tiedostoa...";
+        progressMessage = "Ladataan tiedostoa...";
         errorMessage = "";
         successMessage = "";
 
         try
         {
             var maxFileSize = 50 * 1024 * 1024;
-            byte[] fileBytes;
 
-            using (var stream = selectedFile.OpenReadStream(maxFileSize))
-            using (var ms = new MemoryStream())
+            progressMessage = "Lähetetään tiedostoa palvelimelle...";
+            Logger.LogInformation("Uploading PDF via API: {FileName}", selectedFile.Name);
+
+            // Use upload-file API endpoint which handles:
+            // 1. Azure Document Intelligence for text extraction (including scanned PDFs)
+            // 2. Azure Blob Storage for original file
+            // 3. Chunking and embeddings
+            using var stream = selectedFile.OpenReadStream(maxFileSize);
+            var response = await ApiClient.UploadFileAsync(
+                stream,
+                selectedFile.Name,
+                selectedFile.ContentType ?? "application/pdf",
+                title: Path.GetFileNameWithoutExtension(selectedFile.Name),
+                storeOriginalFile: true);
+
+            if (response != null && response.Status == "success")
             {
-                await stream.CopyToAsync(ms);
-                fileBytes = ms.ToArray();
-            }
+                var blobInfo = response.StoredInBlobStorage 
+                    ? "• Alkuperäinen tiedosto: ✅ Tallennettu Blob Storageen" 
+                    : "• Alkuperäinen tiedosto: ⚠️ Ei tallennettu (Blob Storage ei käytössä)";
 
-            progressMessage = "Poistetaan tekstiä PDF:stä...";
-            var pdfText = ExtractPdfText(fileBytes);
-            
-            if (string.IsNullOrWhiteSpace(pdfText))
-            {
-                pdfText = CreateDocumentContent(selectedFile.Name, fileBytes);
-            }
-
-            Logger.LogInformation("Ingesting PDF: {FileName}, Size: {Size}", selectedFile.Name, fileBytes.Length);
-            progressMessage = "Käsitellään agentilla...";
-            
-            var response = await ApiClient.IngestTextAsync(pdfText, title: selectedFile.Name, source: "pdf-upload");
-
-            if (response != null && response.ThreadId != Guid.Empty)
-            {
                 successMessage = $@"Dokumentti ladattu onnistuneesti! ✅
 
 📄 Tiedostojen tiedot
 ━━━━━━━━━━━━━━━━━━━━
 • Nimi: {selectedFile.Name}
-• Koko: {FormatFileSize(fileBytes.Length)}
+• Koko: {FormatFileSize(selectedFile.Size)}
+• Chunkkeja: {response.ChunksProcessed}
+{blobInfo}
 • Tila: ✅ Valmis
 
 🚀 Seuraavat vaiheet
@@ -249,7 +246,7 @@
             }
             else
             {
-                errorMessage = "Dokumentin lataus epäonnistui.";
+                errorMessage = response?.Message ?? "Dokumentin lataus epäonnistui.";
             }
         }
         catch (Exception ex)
@@ -262,57 +259,6 @@
             isProcessing = false;
             progressMessage = "";
         }
-    }
-
-    private string ExtractPdfText(byte[] fileBytes)
-    {
-        try
-        {
-            var extractedText = new StringBuilder();
-            
-            using (var reader = new PdfReader(new MemoryStream(fileBytes)))
-            using (var doc = new PdfDocument(reader))
-            {
-                var pageCount = doc.GetNumberOfPages();
-                
-                for (int i = 1; i <= pageCount; i++)
-                {
-                    try
-                    {
-                        var page = doc.GetPage(i);
-                        var text = PdfTextExtractor.GetTextFromPage(page);
-                        
-                        if (!string.IsNullOrWhiteSpace(text))
-                        {
-                            extractedText.AppendLine($"\n--- Sivu {i} ---\n");
-                            extractedText.AppendLine(text);
-                        }
-                    }
-                    catch { }
-                }
-            }
-            
-            return extractedText.ToString().Trim();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "PDF-tekstin poisto epäonnistui");
-            return string.Empty;
-        }
-    }
-
-    private string CreateDocumentContent(string fileName, byte[] fileBytes)
-    {
-        var fileSizeKb = fileBytes.Length / 1024.0;
-        return $@"# Dokumentti: {fileName}
-
-## Metatieto
-- Nimi: {fileName}
-- Koko: {fileSizeKb:F2} KB
-- Latausaika: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
-- Tyyppi: PDF
-
-Dokumentti ladattu Blazor-komponentin kautta.";
     }
 
     private string FormatFileSize(long bytes)

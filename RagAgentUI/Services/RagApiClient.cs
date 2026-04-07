@@ -123,8 +123,13 @@ public class RagApiClient
             _logger.LogInformation("[RagApiClient] Uploading file: {FileName}, Size: {Size}, StoreBlob: {StoreBlob}", 
                 fileName, fileStream.Length, storeOriginalFile);
 
-            using var content = new MultipartFormDataContent();
-            using var fileContent = new StreamContent(fileStream);
+            // Copy stream to memory to ensure it can be read
+            using var memoryStream = new MemoryStream();
+            await fileStream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(memoryStream);
             fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
             content.Add(fileContent, "file", fileName);
 
@@ -134,16 +139,19 @@ public class RagApiClient
                 queryParams += $"&title={Uri.EscapeDataString(title)}";
             }
 
+            _logger.LogInformation("[RagApiClient] Sending POST to /api/rag/upload-file{Query}", queryParams);
+
             var response = await _httpClient.PostAsync($"/api/rag/upload-file{queryParams}", content);
+
+            var responseContent = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("[RagApiClient] Response: {Status} - {Content}", response.StatusCode, responseContent);
 
             if (!response.IsSuccessStatusCode)
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("[RagApiClient] File upload failed: {Status} - {Error}", response.StatusCode, errorContent);
-                return null;
+                _logger.LogWarning("[RagApiClient] File upload failed: {Status} - {Error}", response.StatusCode, responseContent);
+                return new FileUploadResponse { Status = "error", Message = responseContent };
             }
 
-            var responseContent = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<FileUploadResponse>(responseContent, _jsonOptions);
 
             _logger.LogInformation("[RagApiClient] File uploaded successfully: {FileName}, BlobStored: {BlobStored}", 
@@ -154,7 +162,7 @@ public class RagApiClient
         catch (Exception ex)
         {
             _logger.LogError(ex, "[RagApiClient] Error uploading file: {FileName}", fileName);
-            return null;
+            return new FileUploadResponse { Status = "error", Message = ex.Message };
         }
     }
 
