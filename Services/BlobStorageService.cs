@@ -115,16 +115,19 @@ public class BlobStorageService : IBlobStorageService
     private readonly BlobContainerClient? _containerClient;
     private readonly BlobStorageSettings _settings;
     private readonly ILogger<BlobStorageService> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly bool _isEnabled;
 
     public bool IsEnabled => _isEnabled;
 
     public BlobStorageService(
         IOptions<BlobStorageSettings> settings,
-        ILogger<BlobStorageService> logger)
+        ILogger<BlobStorageService> logger,
+        IServiceScopeFactory scopeFactory)
     {
         _settings = settings.Value;
         _logger = logger;
+        _scopeFactory = scopeFactory;
 
         if (!_settings.Enabled || string.IsNullOrEmpty(_settings.ConnectionString))
         {
@@ -223,6 +226,11 @@ public class BlobStorageService : IBlobStorageService
         catch (Exception ex)
         {
             _logger.LogError(ex, "[BlobStorage] Failed to upload file: {FileName}", fileName);
+
+            // Log to error dashboard
+            _ = LogErrorToDashboardAsync(ex, "BlobStorage.Upload", 
+                $"Failed to upload file {fileName}: {ex.Message}");
+
             return new BlobUploadResult
             {
                 Success = false,
@@ -358,5 +366,28 @@ public class BlobStorageService : IBlobStorageService
         using var sha256 = SHA256.Create();
         var hashBytes = await sha256.ComputeHashAsync(stream, cancellationToken);
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
+    }
+
+    private async Task LogErrorToDashboardAsync(Exception ex, string operationName, string message)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var errorLogService = scope.ServiceProvider.GetService<IErrorLogService>();
+
+            if (errorLogService != null)
+            {
+                await errorLogService.LogErrorAsync(
+                    message: message,
+                    category: "BlobStorage",
+                    severity: "ERROR",
+                    operationName: operationName,
+                    requestId: null);
+            }
+        }
+        catch (Exception logEx)
+        {
+            _logger.LogWarning(logEx, "[BlobStorage] Failed to log error to dashboard");
+        }
     }
 }

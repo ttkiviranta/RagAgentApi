@@ -9,10 +9,15 @@ public class AzureOpenAIService : IAzureOpenAIService
     private readonly OpenAIClient _client;
     private readonly AzureOpenAIConfig _config;
     private readonly ILogger<AzureOpenAIService> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    public AzureOpenAIService(IConfiguration configuration, ILogger<AzureOpenAIService> logger)
+    public AzureOpenAIService(
+        IConfiguration configuration, 
+        ILogger<AzureOpenAIService> logger,
+        IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
+        _scopeFactory = scopeFactory;
         _config = new AzureOpenAIConfig();
     configuration.GetSection("Azure:OpenAI").Bind(_config);
 
@@ -38,6 +43,11 @@ _logger.LogDebug("Generated embedding with {Dimensions} dimensions for text of l
         catch (Exception ex)
  {
 _logger.LogError(ex, "Failed to generate embedding for text of length {Length}", text.Length);
+
+       // Log to error dashboard
+       _ = LogErrorToDashboardAsync(ex, "OpenAI.GetEmbedding", 
+           $"Failed to generate embedding: {ex.Message}");
+
        throw;
         }
 }
@@ -228,5 +238,28 @@ Now answer the user's question. If the context is not relevant, use your general
         public string ApiVersion { get; set; } = string.Empty;
         public int MaxTokens { get; set; } = 8192;
         public float Temperature { get; set; } = 0.7f;
+    }
+
+    private async Task LogErrorToDashboardAsync(Exception ex, string operationName, string message)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var errorLogService = scope.ServiceProvider.GetService<IErrorLogService>();
+
+            if (errorLogService != null)
+            {
+                await errorLogService.LogErrorAsync(
+                    message: message,
+                    category: "AzureOpenAI",
+                    severity: "ERROR",
+                    operationName: operationName,
+                    requestId: null);
+            }
+        }
+        catch (Exception logEx)
+        {
+            _logger.LogWarning(logEx, "[AzureOpenAI] Failed to log error to dashboard");
+        }
     }
 }

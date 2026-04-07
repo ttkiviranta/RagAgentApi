@@ -1,5 +1,6 @@
 using Azure;
 using Azure.AI.FormRecognizer.DocumentAnalysis;
+using RagAgentApi.Services;
 
 namespace RagAgentApi.Services;
 
@@ -10,13 +11,16 @@ public class AzureDocumentIntelligenceService : IAzureDocumentIntelligenceServic
 {
     private readonly DocumentAnalysisClient? _client;
     private readonly ILogger<AzureDocumentIntelligenceService> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly bool _isConfigured;
 
     public AzureDocumentIntelligenceService(
         IConfiguration configuration, 
-        ILogger<AzureDocumentIntelligenceService> logger)
+        ILogger<AzureDocumentIntelligenceService> logger,
+        IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
+        _scopeFactory = scopeFactory;
         
         var endpoint = configuration["Azure:DocumentIntelligence:Endpoint"];
         var key = configuration["Azure:DocumentIntelligence:Key"];
@@ -82,12 +86,45 @@ public class AzureDocumentIntelligenceService : IAzureDocumentIntelligenceServic
         {
             _logger.LogError(ex, "[DocumentIntelligence] Azure API error: {Status} - {Message}", 
                 ex.Status, ex.Message);
+
+            // Log to error dashboard
+            await LogErrorToDashboardAsync(ex, "DocumentIntelligence.ExtractText", 
+                $"Azure Document Intelligence API error: {ex.Status} - {ex.Message}");
+
             return string.Empty;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[DocumentIntelligence] Unexpected error during text extraction");
+
+            // Log to error dashboard
+            await LogErrorToDashboardAsync(ex, "DocumentIntelligence.ExtractText", 
+                $"Unexpected error during OCR text extraction: {ex.Message}");
+
             return string.Empty;
+        }
+    }
+
+    private async Task LogErrorToDashboardAsync(Exception ex, string operationName, string message)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var errorLogService = scope.ServiceProvider.GetService<IErrorLogService>();
+
+            if (errorLogService != null)
+            {
+                await errorLogService.LogErrorAsync(
+                    message: message,
+                    category: "DocumentIntelligence",
+                    severity: "ERROR",
+                    operationName: operationName,
+                    requestId: null);
+            }
+        }
+        catch (Exception logEx)
+        {
+            _logger.LogWarning(logEx, "[DocumentIntelligence] Failed to log error to dashboard");
         }
     }
 

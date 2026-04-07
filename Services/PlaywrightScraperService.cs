@@ -1,6 +1,7 @@
 using Microsoft.Playwright;
 using HtmlAgilityPack;
 using System.Text;
+using RagAgentApi.Services;
 
 namespace RagAgentApi.Services;
 
@@ -18,14 +19,18 @@ public interface IPlaywrightScraperService
 public class PlaywrightScraperService : IPlaywrightScraperService, IAsyncDisposable
 {
     private readonly ILogger<PlaywrightScraperService> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
     private IPlaywright? _playwright;
     private IBrowser? _browser;
     private bool _initialized = false;
     private readonly SemaphoreSlim _initLock = new(1, 1);
 
-    public PlaywrightScraperService(ILogger<PlaywrightScraperService> logger)
+    public PlaywrightScraperService(
+        ILogger<PlaywrightScraperService> logger,
+        IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
+        _scopeFactory = scopeFactory;
     }
 
     public async Task InitializeAsync()
@@ -123,6 +128,10 @@ public class PlaywrightScraperService : IPlaywrightScraperService, IAsyncDisposa
             _logger.LogError(ex, "[PlaywrightScraperService] Error scraping {Url}", url);
             result.Success = false;
             result.ErrorMessage = ex.Message;
+
+            // Log to error dashboard
+            _ = LogErrorToDashboardAsync(ex, "Playwright.Scrape", 
+                $"Failed to scrape URL {url}: {ex.Message}");
         }
 
         return result;
@@ -339,6 +348,29 @@ public class PlaywrightScraperService : IPlaywrightScraperService, IAsyncDisposa
     {
         await DisposeAsync();
         GC.SuppressFinalize(this);
+    }
+
+    private async Task LogErrorToDashboardAsync(Exception ex, string operationName, string message)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var errorLogService = scope.ServiceProvider.GetService<IErrorLogService>();
+
+            if (errorLogService != null)
+            {
+                await errorLogService.LogErrorAsync(
+                    message: message,
+                    category: "PlaywrightScraper",
+                    severity: "ERROR",
+                    operationName: operationName,
+                    requestId: null);
+            }
+        }
+        catch (Exception logEx)
+        {
+            _logger.LogWarning(logEx, "[PlaywrightScraper] Failed to log error to dashboard");
+        }
     }
 }
 

@@ -65,18 +65,18 @@
                 <p class="text-gray-500 dark:text-gray-400 mt-4">Loading errors...</p>
             </div>
         }
-        <!-- No Errors -->
         else if (errors == null || errors.Count == 0)
         {
+            <!-- No Errors -->
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-12 text-center">
                 <p class="text-gray-500 dark:text-gray-400 text-lg">
                     ✅ No errors found. Your application is running smoothly!
                 </p>
             </div>
         }
-        <!-- Errors List -->
         else
         {
+            <!-- Errors List -->
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
                 <!-- Table Header -->
                 <div class="overflow-x-auto">
@@ -180,15 +180,26 @@
                             <p class="text-sm text-gray-900 dark:text-white">@selectedError.Message</p>
                         </div>
 
-                        <div>
-                            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Root Cause Analysis</h3>
-                            <p class="text-sm text-gray-900 dark:text-white">@selectedError.RootCauseAnalysis</p>
-                        </div>
+                        @if (!string.IsNullOrEmpty(selectedError.RootCauseAnalysis))
+                        {
+                            <div>
+                                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Root Cause Analysis</h3>
+                                <p class="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">@selectedError.RootCauseAnalysis</p>
+                            </div>
+                        }
 
-                        <div>
-                            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Recommended Actions</h3>
-                            <p class="text-sm text-gray-900 dark:text-white font-mono">@selectedError.RecommendedActions</p>
-                        </div>
+                        @if (!string.IsNullOrEmpty(selectedError.RecommendedActions) && selectedError.RecommendedActions != "[]")
+                        {
+                            <div>
+                                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Recommended Actions</h3>
+                                <ul class="text-sm text-gray-900 dark:text-white list-disc list-inside space-y-1">
+                                    @foreach (var action in ParseRecommendedActions(selectedError.RecommendedActions))
+                                    {
+                                        <li>@action</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
 
                         @if (!string.IsNullOrEmpty(selectedError.StackTrace))
                         {
@@ -302,4 +313,20 @@
         "CRITICAL" => "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
         _ => "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300"
     };
+
+    private List<string> ParseRecommendedActions(string json)
+    {
+        if (string.IsNullOrEmpty(json) || json == "[]")
+            return new List<string>();
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+        }
+        catch
+        {
+            // If not valid JSON, return as single item
+            return new List<string> { json };
+        }
+    }
 }
