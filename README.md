@@ -7,6 +7,8 @@ A sophisticated **multi-agent Retrieval-Augmented Generation (RAG) system** buil
 ### Multi-Agent System with Dynamic Selection
 The API implements an **enhanced multi-agent architecture** where specialized agents are **dynamically selected** based on content type:
 
+![Multi-Agent System with Dynamic Selection](docs/images/multi-agent-system.png)
+
 #### Core Pipeline Agents
 - **OrchestratorAgent**: **Enhanced** coordinator with dynamic agent selection and pipeline execution
 - **ScraperAgent**: Extracts and cleans content from web URLs using HtmlAgilityPack
