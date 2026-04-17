@@ -14,6 +14,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documents", "Documents", "{
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RagAgentApi.Tests", "RagAgentApi.Tests\RagAgentApi.Tests.csproj", "{B451527E-1A7D-4E3E-B401-527C2AC52921}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AzureFunctionsDemo", "AzureFunctionsDemo\AzureFunctionsDemo.csproj", "{DEE291D3-CBB3-4020-B25D-A613D737F8CC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -60,6 +62,18 @@ Global
 		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Release|x64.Build.0 = Release|Any CPU
 		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Release|x86.ActiveCfg = Release|Any CPU
 		{B451527E-1A7D-4E3E-B401-527C2AC52921}.Release|x86.Build.0 = Release|Any CPU
+		{DEE291D3-CBB3-4020-B25D-A613D737F8CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DEE291D3-CBB3-4020-B25D-A613D737F8CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DEE291D3-CBB3-4020-B25D-A613D737F8CC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{DEE291D3-CBB3-4020-B25D-A613D737F8CC}.Debug|x64.Build.0 = Debug|Any CPU
+		{DEE291D3-CBB3-4020-B25D-A613D737F8CC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{DEE291D3-CBB3-4020-B25D-A613D737F8CC}.Debug|x86.Build.0 = Debug|Any CPU
+		{DEE291D3-CBB3-4020-B25D-A613D737F8CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DEE291D3-CBB3-4020-B25D-A613D737F8CC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DEE291D3-CBB3-4020-B25D-A613D737F8CC}.Release|x64.ActiveCfg = Release|Any CPU
+		{DEE291D3-CBB3-4020-B25D-A613D737F8CC}.Release|x64.Build.0 = Release|Any CPU
+		{DEE291D3-CBB3-4020-B25D-A613D737F8CC}.Release|x86.ActiveCfg = Release|Any CPU
+		{DEE291D3-CBB3-4020-B25D-A613D737F8CC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

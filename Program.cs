@@ -106,6 +106,13 @@ builder.Services.Configure<RagAgentApi.Services.BlobStorageSettings>(
     builder.Configuration.GetSection("BlobStorage"));
 builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
 
+// PDF Queue Service (optional - only registered if ServiceBus is configured)
+var serviceBusConnectionString = builder.Configuration["ServiceBus:ConnectionString"];
+if (!string.IsNullOrWhiteSpace(serviceBusConnectionString))
+{
+    builder.Services.AddSingleton<IPdfQueueService, PdfQueueService>();
+}
+
 // Retrieval Strategies
 builder.Services.Configure<RagAgentApi.Services.Retrieval.RetrievalSettings>(
     builder.Configuration.GetSection("Retrieval"));

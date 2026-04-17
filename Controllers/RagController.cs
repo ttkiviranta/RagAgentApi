@@ -373,6 +373,7 @@ public class RagController : ControllerBase
             var chunkerAgent = HttpContext.RequestServices.GetRequiredService<ChunkerAgent>();
             var embeddingAgent = HttpContext.RequestServices.GetRequiredService<EmbeddingAgent>();
             var storageAgent = HttpContext.RequestServices.GetRequiredService<PostgresStorageAgent>();
+            var pdfQueueService = HttpContext.RequestServices.GetService<IPdfQueueService>();
 
             BlobUploadResult? blobResult = null;
 
@@ -395,6 +396,49 @@ public class RagController : ControllerBase
                 {
                     _logger.LogInformation("[UploadFile] Blob upload successful: {BlobUri}", blobResult.BlobUri);
                 }
+            }
+
+            // Step 2: For PDFs, send to queue for async processing if queue service is available
+            bool isPdf = file.ContentType == "application/pdf" || file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+            if (isPdf && pdfQueueService != null && blobResult?.Success == true)
+            {
+                var queueMessage = new RagAgentApi.Models.PdfProcessingMessage
+                {
+                    DocumentId = documentId,
+                    ThreadId = threadId,
+                    FileName = file.FileName,
+                    BlobUri = blobResult.BlobUri!,
+                    BlobName = blobResult.BlobName!,
+                    ContainerName = blobResult.ContainerName!,
+                    FileHash = blobResult.FileHash!,
+                    FileSizeBytes = blobResult.FileSizeBytes,
+                    MimeType = file.ContentType,
+                    DocumentTitle = documentTitle,
+                    ChunkSize = chunkSize,
+                    ChunkOverlap = chunkOverlap
+                };
+
+                await pdfQueueService.SendPdfProcessingMessageAsync(queueMessage, cancellationToken);
+                stopwatch.Stop();
+
+                _logger.LogInformation("[UploadFile] PDF queued for async processing: {FileName}, DocumentId: {DocumentId}", file.FileName, documentId);
+
+                return Ok(new FileUploadResponse
+                {
+                    ThreadId = threadId,
+                    DocumentId = documentId,
+                    Status = "queued",
+                    Message = "PDF uploaded to Blob Storage and queued for processing. Chunking and embedding will complete in the background.",
+                    FileName = file.FileName,
+                    FileSizeBytes = file.Length,
+                    MimeType = file.ContentType,
+                    StoredInBlobStorage = true,
+                    BlobUri = blobResult.BlobUri,
+                    FileHash = blobResult.FileHash,
+                    ChunksProcessed = 0,
+                    ExecutionTimeMs = (int)stopwatch.ElapsedMilliseconds,
+                    RetrievalMode = "FileFirst"
+                });
             }
 
             // Step 2: Extract text content from file
