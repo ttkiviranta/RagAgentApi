@@ -1,0 +1,78 @@
+@using RagAgentUI.Models
+@inject RagAgentUI.Services.RagApiClient ApiClient
+
+<link href="/css/chatwidget.css" rel="stylesheet" />
+
+<div class="chat-widget">
+    <button class="chat-toggle" @onclick="ToggleOpen" aria-label="Toggle chat">@(!IsOpen ? "Chat" : "×")</button>
+
+    @if (IsOpen)
+    {
+        <div class="chat-panel" role="dialog" aria-label="Chat window">
+            <div class="chat-header">Chat</div>
+            <div class="chat-messages" tabindex="0">
+                @foreach (var m in Messages)
+                {
+                    <div class="message @(m.IsUser ? "user" : "bot")">
+                        <div class="message-text">@m.Text</div>
+                        <div class="message-time">@m.Time.ToShortTimeString()</div>
+                    </div>
+                }
+            </div>
+
+            <div class="chat-input">
+                <input placeholder="Type a message..." @bind="NewMessage" />
+                <button type="button" @onclick="SendMessage">Send</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // ...simple message model used by the widget
+    private class WidgetMessage
+    {
+        public string Text { get; set; } = string.Empty;
+        public DateTime Time { get; set; }
+        public bool IsUser { get; set; }
+    }
+
+    private bool IsOpen { get; set; }
+    private string NewMessage { get; set; } = string.Empty;
+    private List<WidgetMessage> Messages { get; set; } = new();
+
+    private void ToggleOpen()
+    {
+        IsOpen = !IsOpen;
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(NewMessage))
+            return;
+
+        var userMsg = new WidgetMessage { Text = NewMessage, Time = DateTime.Now, IsUser = true };
+        Messages.Add(userMsg);
+
+        NewMessage = string.Empty;
+
+        try
+        {
+            // Use RagApiClient which has BaseAddress configured by DI
+            var response = await ApiClient.QueryAsync(Guid.Empty, userMsg.Text);
+            var reply = response?.Answer ?? "";
+            if (!string.IsNullOrWhiteSpace(reply))
+            {
+                Messages.Add(new WidgetMessage { Text = reply, Time = DateTime.Now, IsUser = false });
+            }
+            else
+            {
+                Messages.Add(new WidgetMessage { Text = "No reply received.", Time = DateTime.Now, IsUser = false });
+            }
+        }
+        catch (Exception ex)
+        {
+            Messages.Add(new WidgetMessage { Text = "Error: " + ex.Message, Time = DateTime.Now, IsUser = false });
+        }
+    }
+}
