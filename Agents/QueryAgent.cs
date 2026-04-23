@@ -106,7 +106,26 @@ _logger.LogWarning("[QueryAgent] No relevant documents found for query: '{Query}
             var systemPrompt = BuildSystemPrompt();
             var userPrompt = BuildUserPrompt(contextText, query);
 
-    var answer = await _openAIService.GetChatCompletionAsync(systemPrompt, userPrompt, cancellationToken);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var answer = await _openAIService.GetChatCompletionAsync(systemPrompt, userPrompt, cancellationToken);
+            sw.Stop();
+
+            // Telemetry: report LLM call latency and token counts if available in context
+            try
+            {
+                var telemetry = HttpContextAccessorHolder.Accessor?.HttpContext?.RequestServices.GetService(typeof(ITelemetryService)) as ITelemetryService;
+                if (telemetry != null)
+                {
+                    var props = new Dictionary<string, string>
+                    {
+                        { "selected_agent", Name },
+                        { "retrieval_mode", context.State.GetValueOrDefault("retrieval_mode")?.ToString() ?? "Rag" },
+                        { "query", query.Length > 100 ? query.Substring(0, 100) : query }
+                    };
+                    telemetry.TrackMetric("llm_call_latency_ms", sw.ElapsedMilliseconds, props);
+                }
+            }
+            catch { }
 
       // Step 6: Prepare sources information
         var sources = filteredResults.Select(r => new

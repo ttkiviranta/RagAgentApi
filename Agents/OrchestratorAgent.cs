@@ -14,17 +14,20 @@ public class OrchestratorAgent : BaseRagAgent
     private readonly AgentSelectorService _agentSelectorService;
     private readonly AgentFactory _agentFactory;
     private readonly RagDbContext _context;
+    private readonly ITelemetryService _telemetry;
 
     public OrchestratorAgent(
         AgentSelectorService agentSelectorService,
         AgentFactory agentFactory,
         RagDbContext context,
         ILogger<OrchestratorAgent> logger,
+        ITelemetryService telemetry,
         IErrorLogService? errorLogService = null) : base(logger, errorLogService)
     {
         _agentSelectorService = agentSelectorService;
         _agentFactory = agentFactory;
         _context = context;
+        _telemetry = telemetry;
     }
 
     public override string Name => "OrchestratorAgent";
@@ -78,7 +81,23 @@ public class OrchestratorAgent : BaseRagAgent
                     var agentExecutionId = await LogAgentExecutionStartAsync(
                         executionId, agent.Name, currentContext, cancellationToken);
 
+                    var swAgent = System.Diagnostics.Stopwatch.StartNew();
                     var agentResult = await agent.ExecuteAsync(currentContext, cancellationToken);
+                    swAgent.Stop();
+
+                    // Telemetry: track agent execution latency and selected agent
+                    try
+                    {
+                        var props = new Dictionary<string, string>
+                        {
+                            { "agent_name", agent.Name },
+                            { "selected_agent", agent.Name },
+                            { "retrieval_mode", currentContext.State.GetValueOrDefault("retrieval_mode")?.ToString() ?? "unknown" }
+                        };
+
+                        _telemetry.TrackMetric("llm_call_latency_ms", swAgent.ElapsedMilliseconds, props);
+                    }
+                    catch { /* ignore telemetry failures */ }
                     pipelineResults.Add(agentResult);
 
                     // Log agent execution completion

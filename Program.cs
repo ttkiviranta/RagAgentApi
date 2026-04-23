@@ -94,6 +94,15 @@ builder.Services.AddSingleton<IAzureOpenAIService, AzureOpenAIService>();
 builder.Services.AddSingleton<IAzureSearchService, AzureSearchService>();
 builder.Services.AddSingleton<IAzureDocumentIntelligenceService, AzureDocumentIntelligenceService>();
 
+// Register IHttpContextAccessor and set holder
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton(provider =>
+{
+    var accessor = provider.GetRequiredService<IHttpContextAccessor>();
+    Services.HttpContextAccessorHolder.Accessor = accessor;
+    return accessor;
+});
+
 // PostgreSQL Services
 builder.Services.AddScoped<PostgresQueryService>();
 builder.Services.AddScoped<ConversationService>();
@@ -127,6 +136,22 @@ var blobStorageEnabled = builder.Configuration.GetValue<bool>("BlobStorage:Enabl
 
 // Error Logging Service
 builder.Services.AddScoped<IErrorLogService, ErrorLogService>();
+
+// Telemetry service (wraps Application Insights)
+builder.Services.AddSingleton<Services.ITelemetryService, Services.TelemetryService>();
+// Ensure Application Insights TelemetryClient is available for TelemetryService
+builder.Services.AddSingleton(provider =>
+{
+    // TelemetryClient is registered by AddApplicationInsightsTelemetry when configured; if not available, create a default one.
+    var config = provider.GetService<Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration>();
+    if (config != null)
+        return new Microsoft.ApplicationInsights.TelemetryClient(config);
+
+    return new Microsoft.ApplicationInsights.TelemetryClient();
+});
+
+// Guardrail service for basic input validation
+builder.Services.AddSingleton<Services.IGuardrailService, Services.GuardrailService>();
 
 // Agents - Scoped for request lifecycle
 builder.Services.AddScoped<OrchestratorAgent>();

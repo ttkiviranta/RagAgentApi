@@ -385,6 +385,37 @@ curl -X POST "https://localhost:7000/api/Rag/query" \
   }'
 ```
 
+## EvalOps: running evaluations
+
+This repository includes a small evaluation harness to run regression-style checks against the running API.
+
+1. Eval dataset
+   - Edit or extend eval/questions.json in the repository root. Each item is a JSON object with fields:
+     - q: the question to send to the API
+     - expected: the expected answer (used for simple similarity comparison)
+
+2. Eval runner
+   - The console runner project is RagAgentApi.EvalRunner.
+   - Run it with:
+     - dotnet run --project RagAgentApi.EvalRunner -- https://localhost:7000
+     - The runner posts to /api/Rag/query and prints per-question similarity scores and an overall score.
+
+3. Regression tests
+   - A test class EvalRegressionTests is added to RagAgentApi.Tests.
+   - Tests assume the API is running at https://localhost:7000 when the tests execute.
+   - To run tests:
+     - dotnet test
+
+4. Similarity & interpreting scores
+   - The runner and test use a simple normalized Levenshtein-based similarity metric (1.0 = exact match, 0.0 = totally different).
+   - Scores near 1.0 indicate high similarity; a threshold of 0.8 is used by the regression test as a baseline.
+   - For production-grade evaluation, consider semantic similarity using embeddings or human labeling.
+
+Notes
+- The eval runner and tests are intentionally simple and do not change core API logic.
+- Ensure the API is running and accessible at the base URL you pass to the runner/tests.
+
+
 ## 📊 Agent Types & URL Routing
 
 The system automatically selects specialized agents based on URL patterns:

@@ -1,0 +1,4 @@
+[
+  { "q": "What is Semantic Kernel?", "expected": "Semantic Kernel is an SDK for building AI apps that combine LLMs with orchestration and memory capabilities." },
+  { "q": "How does File-First mode work?", "expected": "File-First loads full documents and provides complete context to the LLM; best for small document collections." }
+]
