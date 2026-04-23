@@ -99,7 +99,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(provider =>
 {
     var accessor = provider.GetRequiredService<IHttpContextAccessor>();
-    Services.HttpContextAccessorHolder.Accessor = accessor;
+    HttpContextAccessorHolder.Accessor = accessor;
     return accessor;
 });
 
@@ -138,7 +138,7 @@ var blobStorageEnabled = builder.Configuration.GetValue<bool>("BlobStorage:Enabl
 builder.Services.AddScoped<IErrorLogService, ErrorLogService>();
 
 // Telemetry service (wraps Application Insights)
-builder.Services.AddSingleton<Services.ITelemetryService, Services.TelemetryService>();
+builder.Services.AddSingleton<ITelemetryService, TelemetryService>();
 // Ensure Application Insights TelemetryClient is available for TelemetryService
 builder.Services.AddSingleton(provider =>
 {
@@ -151,7 +151,7 @@ builder.Services.AddSingleton(provider =>
 });
 
 // Guardrail service for basic input validation
-builder.Services.AddSingleton<Services.IGuardrailService, Services.GuardrailService>();
+builder.Services.AddSingleton<IGuardrailService, GuardrailService>();
 
 // Agents - Scoped for request lifecycle
 builder.Services.AddScoped<OrchestratorAgent>();
@@ -291,6 +291,8 @@ app.UseHttpsRedirection();
 
 app.UseCors("AllowBlazorUI");
 
+// Guardrail middleware: validate inputs for RAG endpoints before routing
+app.UseMiddleware<GuardrailMiddleware>();
 app.UseRouting();
 
 app.UseAuthorization();

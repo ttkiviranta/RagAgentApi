@@ -67,6 +67,7 @@
 
   <ItemGroup>
     <None Include=".github\copilot-instructions.md" />
+    <None Include="RagAgentApi.EvalRunner\RagAgentApi.EvalRunner.csproj" />
   </ItemGroup>
 
 </Project>
