@@ -94,6 +94,11 @@ builder.Services.AddSingleton<IAzureOpenAIService, AzureOpenAIService>();
 builder.Services.AddSingleton<IAzureSearchService, AzureSearchService>();
 builder.Services.AddSingleton<IAzureDocumentIntelligenceService, AzureDocumentIntelligenceService>();
 
+// LLM Provider Services - support for multiple providers (Azure OpenAI, Qwen via OpenRouter/Groq/Together, etc.)
+builder.Services.AddSingleton<IOpenAICompatibleLlmService, OpenAICompatibleLlmService>();
+builder.Services.AddSingleton<LlmServiceFactory>();
+builder.Services.AddSingleton<LlmService>();  // Unified LLM service that routes to configured provider
+
 // Register IHttpContextAccessor and set holder
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(provider =>

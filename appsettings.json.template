@@ -41,7 +41,18 @@
       "Key": "YOUR_AZURE_DOCUMENT_INTELLIGENCE_KEY"
     }
   },
-  
+
+  "LlmProviders": {
+    "Default": "AzureOpenAI",
+    "OpenAICompatible": {
+      "BaseUrl": "https://api.groq.com/openai/v1/chat/completions",
+      "ApiKey": "YOUR_GROQ_API_KEY_OR_OTHER_PROVIDER",
+      "ModelName": "qwen-2.5-7b",
+      "MaxTokens": 8192,
+      "Temperature": 0.7
+    }
+  },
+
   "RagSettings": {
     "Mode": "hybrid",
     "DefaultChunkSize": 1000,
