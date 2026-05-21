@@ -146,6 +146,24 @@ At the final stage, the system compiles the aggregated context into a unified re
 - ✅ **Health Monitoring**: Service health checks and dependency validation
 - ✅ **Background Services**: Automatic context cleanup and database maintenance
 
+### 🔍 LLMOps: Comprehensive Observability
+- ✅ **Telemetry Service**: Wraps Application Insights for LLM call tracking
+- ✅ **Prompt Versioning**: Versioned prompts in `Prompts/` folder with startup loading
+- ✅ **LLM Call Metrics**: Track agent name, prompt version, model version, latency, token usage
+- ✅ **LLMCallTelemetry**: Standardized telemetry class encapsulating all LLM metrics
+- ✅ **Input Validation**: Minimum/maximum length checks and empty input validation
+- ✅ **Output Validation**: JSON schema validation for structured responses
+- ✅ **Hallucination Detection**: Detect suspicious URLs, patterns, and malformed code blocks
+- ✅ **Guardrails Service**: Comprehensive input/output validation before and after LLM calls
+
+### 🧪 EvalOps: Quality Assurance & Regression Testing
+- ✅ **Golden Dataset**: 30+ curated Q&A pairs in `eval/questions.json`
+- ✅ **Embedding-Based Similarity**: Cosine similarity scoring for evaluation
+- ✅ **EvalRunner**: Console application for running evaluation against live API
+- ✅ **Similarity Metrics**: Mean, median, min, max, and standard deviation reporting
+- ✅ **Regression Tests**: Automated tests ensuring evaluation score stays above 0.85
+- ✅ **CI/CD Integration**: GitHub Actions workflow for automatic evaluation on main branch
+
 ## 📋 Prerequisites
 
 ### Required Software
@@ -727,6 +745,161 @@ Every pipeline execution is tracked with detailed metrics:
 - PostgreSQL pgvector with IVFFlat indexing
 - Cosine similarity search optimized for 1536-dimensional vectors
 - Metadata filtering and hybrid search capabilities
+
+## 🛡️ LLMOps Architecture
+
+### Prompt Versioning
+Prompts are managed through versioned text files stored in the `Prompts/` folder:
+
+```
+Prompts/
+├── OrchestratorAgent_v1.txt
+├── QueryAgent_v1.txt
+├── ChunkerAgent_v1.txt
+├── ScraperAgent_v1.txt
+└── EmbeddingAgent_v1.txt
+```
+
+The `PromptService` loads all prompts at startup and makes them available to agents. Prompt versions are included in LLM call telemetry.
+
+### LLM Telemetry
+Every LLM call is instrumented with comprehensive metrics:
+
+```csharp
+new LLMCallTelemetry()
+    .WithAgent("OrchestratorAgent")
+    .WithPromptVersion("v1")
+    .WithModelVersion("gpt-3.5-turbo")
+    .WithLatency(1250) // ms
+    .WithTokens(450, 120) // input, output
+    .WithSuccess(true)
+    .Track(telemetry);
+```
+
+Tracked metrics include:
+- **llm_call**: Event logged for each LLM invocation
+- **llm_call_latency_ms**: Latency in milliseconds (Application Insights metric)
+- **llm_input_tokens**: Input token count
+- **llm_output_tokens**: Output token count
+- **agent_name, prompt_version, model_version**: Dimensional properties
+
+### Guardrails: Input/Output Validation
+The `GuardrailService` enforces safety constraints:
+
+```csharp
+// Input validation
+var (isValid, error) = guardrailService.ValidateInput(userQuery, "user_input");
+if (!isValid) return BadRequest(error);
+
+// Output validation (JSON)
+var (isJsonValid, jsonError) = guardrailService.ValidateOutput(llmResponse, expectJson: true);
+
+// Hallucination detection
+var (isHallucinated, details) = guardrailService.CheckForHallucinations(llmResponse);
+if (isHallucinated) logger.LogWarning("Hallucination detected: {Details}", details);
+```
+
+**Input Validation:**
+- Minimum length (default 3 characters)
+- Maximum length (default 2000 characters)
+- Empty input checks
+
+**Output Validation:**
+- JSON schema validation for structured responses
+- Empty output detection
+
+**Hallucination Detection:**
+- Suspicious URL patterns (localhost, example.com)
+- Unusual email pattern concentrations
+- Unbalanced code blocks and malformed syntax
+- Reports violations to telemetry
+
+## 🧪 EvalOps: Quality Assurance
+
+### Golden Dataset
+The `eval/questions.json` file contains 30+ curated question-answer pairs covering all system components:
+
+```json
+[
+  {
+    "question": "What is the purpose of the OrchestratorAgent?",
+    "expected": "The OrchestratorAgent dynamically selects appropriate agents based on content type..."
+  },
+  ...
+]
+```
+
+### Evaluation Runner
+Run manual evaluation using the EvalRunner console application:
+
+```bash
+cd RagAgentApi.EvalRunner
+dotnet run -- https://localhost:7000
+```
+
+Output includes:
+- Per-question similarity scores
+- Overall mean/median/min/max statistics
+- Standard deviation
+- Pass/fail verdict against 0.85 threshold
+
+### Regression Testing
+Automated regression tests ensure quality doesn't degrade:
+
+```csharp
+[Fact]
+public async Task EvalQuestions_Should_MeetThreshold()
+{
+    // Runs all eval questions against running API
+    // Asserts average similarity score >= 0.85
+}
+```
+
+Run regression tests:
+
+```bash
+dotnet test RagAgentApi.Tests --filter "EvalRegression"
+```
+
+**Note:** Regression tests require the API to be running locally (https://localhost:7000).
+
+### Similarity Scoring
+Evaluation uses embedding-based cosine similarity (fallback to Levenshtein distance):
+
+```csharp
+double similarity = await CosineSimilarityAsync(expectedAnswer, actualAnswer);
+// Returns value between 0.0 and 1.0
+// 1.0 = perfect match, 0.0 = no similarity
+```
+
+## 🚀 CI/CD Integration
+
+### GitHub Actions Workflow
+The `.github/workflows/build-test-eval.yml` workflow runs on every push and PR:
+
+1. **Build Job**
+   - Restore dependencies
+   - Compile Release build
+   - Upload build artifacts
+
+2. **Test Job**
+   - Run unit tests with xUnit
+   - Generate and upload test results
+   - Publish test report to GitHub
+
+3. **Evaluation Job** (on main branch only)
+   - Build EvalRunner
+   - Run evaluation suite (informational)
+   - Comment on PRs with results
+
+4. **Code Quality Job**
+   - Run code analysis with Roslynator
+   - Format checks (informational)
+
+**Pipeline Gating:**
+- Build failure → PR cannot merge
+- Unit test failures → PR cannot merge
+- Evaluation score < 0.85 → Warning (informational only)
 
 ## 🔄 Migration from Azure Search
 
