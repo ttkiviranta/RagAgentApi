@@ -8,6 +8,7 @@ public interface ITelemetryService
 {
     void TrackEvent(string name, IDictionary<string, string>? properties = null);
     void TrackMetric(string name, double value, IDictionary<string, string>? properties = null);
+    void TrackLLMCall(string agentName, string promptVersion, string modelVersion, long latencyMs, int inputTokens, int outputTokens, bool success, string? errorMessage = null);
 }
 
 /// <summary>
@@ -48,6 +49,34 @@ public class TelemetryService : ITelemetryService
         catch (System.Exception ex)
         {
             _logger.LogDebug(ex, "Telemetry TrackMetric failed: {Metric}", name);
+        }
+    }
+
+    public void TrackLLMCall(string agentName, string promptVersion, string modelVersion, long latencyMs, int inputTokens, int outputTokens, bool success, string? errorMessage = null)
+    {
+        try
+        {
+            var properties = new Dictionary<string, string>
+            {
+                { "agent_name", agentName },
+                { "prompt_version", promptVersion },
+                { "model_version", modelVersion },
+                { "success", success.ToString() }
+            };
+
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                properties["error_message"] = errorMessage;
+            }
+
+            _client.TrackEvent("llm_call", properties);
+            _client.GetMetric("llm_call_latency_ms").TrackValue(latencyMs);
+            _client.GetMetric("llm_input_tokens").TrackValue(inputTokens);
+            _client.GetMetric("llm_output_tokens").TrackValue(outputTokens);
+        }
+        catch (System.Exception ex)
+        {
+            _logger.LogDebug(ex, "Telemetry TrackLLMCall failed for agent: {Agent}", agentName);
         }
     }
 }

@@ -16,7 +16,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add configuration sources
 builder.Configuration
-    .SetBasePath(Directory.GetCurrentDirectory())
+    //.SetBasePath(Directory.GetCurrentDirectory())
+    .SetBasePath(AppContext.BaseDirectory)
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
     .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true)
@@ -141,6 +142,9 @@ var blobStorageEnabled = builder.Configuration.GetValue<bool>("BlobStorage:Enabl
 
 // Error Logging Service
 builder.Services.AddScoped<IErrorLogService, ErrorLogService>();
+
+// Prompt Service for versioned agent prompts
+builder.Services.AddSingleton<IPromptService, PromptService>();
 
 // Telemetry service (wraps Application Insights)
 builder.Services.AddSingleton<ITelemetryService, TelemetryService>();
@@ -267,13 +271,16 @@ builder.Services.AddCors(options =>
 // Health checks
 builder.Services.AddHealthChecks();
 
+builder.WebHost.UseKestrel();
+builder.WebHost.UseUrls("https://localhost:7000;http://localhost:5000");
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
 // Global exception handling - captures all unhandled exceptions,
 // logs them to database, and sends email notifications for critical errors
-app.UseGlobalExceptionHandling();
+app.UseGlobalExceptionHandling(); //poistin väliaikaisesti, koska haluan testata miten GlobalExceptionMiddleware toimii ilman DeveloperExceptionPagea
 
 if (app.Environment.IsDevelopment())
 {
@@ -340,6 +347,12 @@ startupLogger.LogInformation("Retrieval strategy mode: {RetrievalMode}", retriev
 startupLogger.LogInformation("Blob storage enabled: {BlobStorageEnabled}", blobStorageEnabled);
 startupLogger.LogInformation("Swagger UI available at: {SwaggerUrl}",
     app.Environment.IsDevelopment() ? "https://localhost:7000" : "");
+
+var addresses = app.Urls;
+foreach (var addr in addresses)
+    Console.WriteLine($"Listening on: {addr}");
+
+Console.WriteLine("Kestrel endpoints: " + string.Join(", ", app.Urls));
 
 app.Run();
 
