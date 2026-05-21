@@ -1,4 +1,122 @@
 [
-  { "q": "What is Semantic Kernel?", "expected": "Semantic Kernel is an SDK for building AI apps that combine LLMs with orchestration and memory capabilities." },
-  { "q": "How does File-First mode work?", "expected": "File-First loads full documents and provides complete context to the LLM; best for small document collections." }
+  {
+    "question": "What is the purpose of the OrchestratorAgent in this system?",
+    "expected": "The OrchestratorAgent dynamically selects appropriate agents based on content type, manages the execution pipeline, handles context flow between agents, and logs execution metrics and decisions."
+  },
+  {
+    "question": "How does the system handle GitHub URLs?",
+    "expected": "GitHub URLs are routed to the GitHubApiAgent for specialized processing."
+  },
+  {
+    "question": "What is the role of the QueryAgent?",
+    "expected": "The QueryAgent accepts user queries and search context, generates embeddings for semantic search, retrieves relevant document chunks using vector similarity, and generates context-aware answers based on retrieved documents."
+  },
+  {
+    "question": "Explain the chunking strategy used by the ChunkerAgent",
+    "expected": "The ChunkerAgent splits content into semantic chunks while respecting paragraph boundaries, maintains overlap to preserve context, avoids splitting sentences mid-way, and optimizes chunks for vector embedding efficiency."
+  },
+  {
+    "question": "What content types does the ScraperAgent handle?",
+    "expected": "The ScraperAgent fetches web content from URLs, extracts main content, cleans HTML, and can handle JavaScript-rendered content using Playwright when needed."
+  },
+  {
+    "question": "How are embeddings generated in this system?",
+    "expected": "The EmbeddingAgent uses Azure OpenAI text-embedding-ada-002 model to generate vector embeddings from text chunks, batches process them efficiently, and tracks embedding quality metrics."
+  },
+  {
+    "question": "What validation does the system perform on user input?",
+    "expected": "The system validates input for minimum and maximum length, checks for empty input, and reports validation violations to telemetry."
+  },
+  {
+    "question": "How does the system detect hallucinations?",
+    "expected": "The system checks for suspicious URLs (localhost, example.com), unusual patterns in emails, malformed code blocks, and unbalanced braces in output."
+  },
+  {
+    "question": "What information is tracked in LLM call telemetry?",
+    "expected": "Telemetry tracks agent name, prompt version, model version, latency in milliseconds, input and output token counts, success status, and any error messages."
+  },
+  {
+    "question": "How are prompts managed and versioned?",
+    "expected": "Prompts are stored in separate text files in the Prompts/ folder using a versioning scheme (e.g., OrchestratorAgent_v1.txt) and are loaded at startup by the PromptService."
+  },
+  {
+    "question": "What retrieval strategies are supported by the system?",
+    "expected": "The system supports RAG (retrieval-augmented generation), FileFirst, and Auto retrieval strategies that can be selected based on content type and availability."
+  },
+  {
+    "question": "How does the system handle multi-language queries?",
+    "expected": "The system maintains conversation history for follow-up queries and responds in the same language as the user's question."
+  },
+  {
+    "question": "What happens when a URL returns invalid or incomplete content?",
+    "expected": "The ScraperAgent implements timeout and retry logic for unreliable sources and logs warnings for partially failed extractions."
+  },
+  {
+    "question": "How does output validation work for JSON responses?",
+    "expected": "The system parses and validates JSON format, and returns an error if the output is not valid JSON according to JSON schema validation."
+  },
+  {
+    "question": "What is the maximum chunk overlap in the ChunkerAgent?",
+    "expected": "The ChunkerAgent maintains overlap between chunks to preserve context while optimizing for vector embedding efficiency, with configurable parameters."
+  },
+  {
+    "question": "How are errors handled and logged?",
+    "expected": "Errors are logged via IErrorLogService, tracked in telemetry with severity levels, and can be aggregated for dashboard visualization."
+  },
+  {
+    "question": "What is the purpose of the Guardrails service?",
+    "expected": "The Guardrails service enforces input/output validation rules, detects hallacinations, prevents malformed data from being processed, and reports violations via telemetry."
+  },
+  {
+    "question": "How does the system batch process embeddings?",
+    "expected": "The EmbeddingAgent groups multiple text items into batches of up to 100 items and processes them efficiently, with retry logic for transient failures."
+  },
+  {
+    "question": "What metadata is preserved when chunking content?",
+    "expected": "The ChunkerAgent preserves source, chunk index, and original content hash metadata for each chunk."
+  },
+  {
+    "question": "How are LLM calls monitored and tracked?",
+    "expected": "LLM calls are monitored using stopwatch instrumentation to track latency, with token counts extracted from LLM responses, and comprehensive telemetry events emitted for each call."
+  },
+  {
+    "question": "What is the default temperature setting for chat completions?",
+    "expected": "The default temperature is set to 0.7 for chat completions, which provides a balance between randomness and determinism."
+  },
+  {
+    "question": "How does the system handle context in chat completions?",
+    "expected": "The system uses a hybrid approach where context documents are provided to the LLM, which prefers document-based information but can fall back to general knowledge if context is not relevant."
+  },
+  {
+    "question": "What is the role of the HttpContextAccessorHolder in telemetry?",
+    "expected": "The HttpContextAccessorHolder allows agents to access the HttpContext for best-effort telemetry lookup even when DI is not directly available."
+  },
+  {
+    "question": "How are embeddings cached to improve performance?",
+    "expected": "Embeddings for identical chunks are cached in memory to avoid redundant API calls and reduce costs."
+  },
+  {
+    "question": "What happens if the PromptService cannot find a prompt?",
+    "expected": "The PromptService logs a warning and returns an empty string if a prompt is not found for the requested agent."
+  },
+  {
+    "question": "How are API calls structured to maximize observability?",
+    "expected": "API calls are instrumented with request IDs, telemetry correlation, detailed logging at multiple levels, and error tracking with context information."
+  },
+  {
+    "question": "What telemetry metrics are available for performance monitoring?",
+    "expected": "Available metrics include llm_call_latency_ms, llm_input_tokens, llm_output_tokens, embedding latency, and guardrail violation counts."
+  },
+  {
+    "question": "How does the system prioritize source documents in responses?",
+    "expected": "The system tracks source and relevance scores for retrieved documents and prioritizes them based on semantic similarity scores from vector embeddings."
+  },
+  {
+    "question": "What is the maximum token limit for chat completions?",
+    "expected": "The maximum token limit for chat completions is configured to 8192 tokens in the AzureOpenAIService configuration."
+  },
+  {
+    "question": "How are concurrent LLM calls handled?",
+    "expected": "Concurrent LLM calls are managed through async/await patterns with proper cancellation token support and retry logic for transient failures."
+  }
 ]
