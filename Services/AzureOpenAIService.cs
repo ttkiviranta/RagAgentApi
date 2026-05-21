@@ -29,28 +29,54 @@ new Uri(_config.Endpoint),
     public async Task<float[]> GetEmbeddingAsync(string text, CancellationToken cancellationToken = default)
     {
         try
- {
-       var options = new EmbeddingsOptions(_config.EmbeddingDeployment, new[] { text });
-      var response = await _client.GetEmbeddingsAsync(options, cancellationToken);
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            var options = new EmbeddingsOptions(_config.EmbeddingDeployment, new[] { text });
+            var response = await _client.GetEmbeddingsAsync(options, cancellationToken);
 
             var embedding = response.Value.Data[0].Embedding.ToArray();
-        
-_logger.LogDebug("Generated embedding with {Dimensions} dimensions for text of length {Length}",
-                embedding.Length, text.Length);
 
-        return embedding;
+            sw.Stop();
+
+            _logger.LogDebug("Generated embedding with {Dimensions} dimensions for text of length {Length} in {ElapsedMs}ms",
+                embedding.Length, text.Length, sw.ElapsedMilliseconds);
+
+            // Track LLM call with telemetry
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var telemetry = scope.ServiceProvider.GetService<ITelemetryService>();
+                var promptService = scope.ServiceProvider.GetService<IPromptService>();
+
+                if (telemetry != null)
+                {
+                    var promptVersion = promptService?.GetPromptWithVersion("EmbeddingAgent").version ?? 0;
+                    new LLMCallTelemetry()
+                        .WithAgent("EmbeddingAgent")
+                        .WithPromptVersion($"v{promptVersion}")
+                        .WithModelVersion(_config.EmbeddingDeployment)
+                        .WithLatency(sw.ElapsedMilliseconds)
+                        .WithTokens(0, 0) // Embeddings don't use input/output tokens
+                        .WithSuccess(true)
+                        .Track(telemetry);
+                }
+            }
+            catch { /* Telemetry failures should not affect operation */ }
+
+            return embedding;
         }
         catch (Exception ex)
- {
-_logger.LogError(ex, "Failed to generate embedding for text of length {Length}", text.Length);
+        {
+            _logger.LogError(ex, "Failed to generate embedding for text of length {Length}", text.Length);
 
-       // Log to error dashboard
-       _ = LogErrorToDashboardAsync(ex, "OpenAI.GetEmbedding", 
-           $"Failed to generate embedding: {ex.Message}");
+            // Log to error dashboard
+            _ = LogErrorToDashboardAsync(ex, "OpenAI.GetEmbedding", 
+                $"Failed to generate embedding: {ex.Message}");
 
-       throw;
+            throw;
         }
-}
+    }
 
     public async Task<List<float[]>> GetEmbeddingsAsync(List<string> texts, CancellationToken cancellationToken = default)
     {
@@ -98,39 +124,65 @@ _logger.LogError(ex, "Failed to generate embedding for text of length {Length}",
 
     public async Task<string> GetChatCompletionAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default)
     {
-   const int maxRetries = 3;
- var delays = new[] { TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(8) };
+        const int maxRetries = 3;
+        var delays = new[] { TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(8) };
 
         for (int attempt = 0; attempt < maxRetries; attempt++)
-    {
-  try
+        {
+            try
             {
-     var chatCompletionsOptions = new ChatCompletionsOptions()
-            {
- DeploymentName = _config.ChatDeployment,
-             Messages =
-       {
-   new ChatRequestSystemMessage(systemPrompt),
-  new ChatRequestUserMessage(userPrompt)
-      },
-         MaxTokens = _config.MaxTokens,
-            Temperature = _config.Temperature
-        };
+                var sw = System.Diagnostics.Stopwatch.StartNew();
 
-      var response = await _client.GetChatCompletionsAsync(chatCompletionsOptions, cancellationToken);
-        var content = response.Value.Choices[0].Message.Content;
+                var chatCompletionsOptions = new ChatCompletionsOptions()
+                {
+                    DeploymentName = _config.ChatDeployment,
+                    Messages =
+                    {
+                        new ChatRequestSystemMessage(systemPrompt),
+                        new ChatRequestUserMessage(userPrompt)
+                    },
+                    MaxTokens = _config.MaxTokens,
+                    Temperature = _config.Temperature
+                };
 
-          _logger.LogDebug("Generated chat completion with {TokenCount} tokens",
-   response.Value.Usage.TotalTokens);
+                var response = await _client.GetChatCompletionsAsync(chatCompletionsOptions, cancellationToken);
+                var content = response.Value.Choices[0].Message.Content;
 
-        return content ?? string.Empty;
+                sw.Stop();
+
+                _logger.LogDebug("Generated chat completion with {TokenCount} tokens in {ElapsedMs}ms",
+                    response.Value.Usage.TotalTokens, sw.ElapsedMilliseconds);
+
+                // Track LLM call with telemetry
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var telemetry = scope.ServiceProvider.GetService<ITelemetryService>();
+                    var promptService = scope.ServiceProvider.GetService<IPromptService>();
+
+                    if (telemetry != null)
+                    {
+                        var promptVersion = promptService?.GetPromptWithVersion("QueryAgent").version ?? 0;
+                        new LLMCallTelemetry()
+                            .WithAgent("ChatCompletion")
+                            .WithPromptVersion($"v{promptVersion}")
+                            .WithModelVersion(_config.ChatDeployment)
+                            .WithLatency(sw.ElapsedMilliseconds)
+                            .WithTokens(response.Value.Usage.PromptTokens, response.Value.Usage.CompletionTokens)
+                            .WithSuccess(true)
+                            .Track(telemetry);
+                    }
+                }
+                catch { /* Telemetry failures should not affect operation */ }
+
+                return content ?? string.Empty;
             }
             catch (RequestFailedException ex) when (attempt < maxRetries - 1)
             {
-      _logger.LogWarning(ex, "Attempt {Attempt} failed for chat completion, retrying in {Delay}ms",
-      attempt + 1, delays[attempt].TotalMilliseconds);
-     await Task.Delay(delays[attempt], cancellationToken);
-      }
+                _logger.LogWarning(ex, "Attempt {Attempt} failed for chat completion, retrying in {Delay}ms",
+                    attempt + 1, delays[attempt].TotalMilliseconds);
+                await Task.Delay(delays[attempt], cancellationToken);
+            }
         }
 
         throw new InvalidOperationException($"Failed to get chat completion after {maxRetries} attempts");
