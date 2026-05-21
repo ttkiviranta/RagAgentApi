@@ -67,6 +67,7 @@
 
   <ItemGroup>
     <None Include=".github\copilot-instructions.md" />
+    <None Include=".github\workflows\build-test-eval.yml" />
     <None Include="RagAgentApi.EvalRunner\RagAgentApi.EvalRunner.csproj" />
   </ItemGroup>
 
