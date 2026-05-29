@@ -282,16 +282,22 @@ var app = builder.Build();
 // logs them to database, and sends email notifications for critical errors
 app.UseGlobalExceptionHandling(); //poistin väliaikaisesti, koska haluan testata miten GlobalExceptionMiddleware toimii ilman DeveloperExceptionPagea
 
+// Enable Swagger always in Development, optionally in Production
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "RAG Agent API v1");
-        options.RoutePrefix = string.Empty; // Serve Swagger at root
+        options.RoutePrefix = string.Empty; // Serve Swagger at root "/"
         options.DocumentTitle = "RAG Agent API";
         options.DisplayRequestDuration();
+        options.DefaultModelsExpandDepth(1);
     });
+}
+
+if (app.Environment.IsDevelopment())
+{
     // Note: DeveloperExceptionPage is disabled to allow GlobalExceptionMiddleware to handle errors
 }
 else
@@ -345,8 +351,16 @@ var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
 startupLogger.LogInformation("RAG Agent API starting up...");
 startupLogger.LogInformation("Retrieval strategy mode: {RetrievalMode}", retrievalMode);
 startupLogger.LogInformation("Blob storage enabled: {BlobStorageEnabled}", blobStorageEnabled);
-startupLogger.LogInformation("Swagger UI available at: {SwaggerUrl}",
-    app.Environment.IsDevelopment() ? "https://localhost:7000" : "");
+
+// Log Swagger status
+if (app.Environment.IsDevelopment())
+{
+    startupLogger.LogInformation("✓ Swagger UI enabled at: {SwaggerUrl}", "https://localhost:7000");
+}
+else
+{
+    startupLogger.LogWarning("✗ Swagger UI disabled (not in Development mode)");
+}
 
 var addresses = app.Urls;
 foreach (var addr in addresses)

@@ -211,15 +211,23 @@
         {
             Console.WriteLine("[Home] OnInitializedAsync starting");
 
-            // Load retrieval configuration
+            // Load retrieval configuration with retry logic
             try
             {
-                retrievalConfig = await ApiClient.GetRetrievalConfigAsync();
+                retrievalConfig = await GetRetrievalConfigWithRetryAsync();
                 Console.WriteLine($"[Home] Retrieval mode: {retrievalConfig?.Mode}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Home] Failed to load retrieval config: {ex.Message}");
+                Console.WriteLine($"[Home] Failed to get retrieval config: {ex.Message}");
+                // Use default config if API not available yet
+                retrievalConfig = new RagApiClient.RetrievalConfigDto 
+                { 
+                    Mode = "Rag",
+                    AutoModeDocumentThreshold = 10,
+                    AutoModeContentSizeThresholdKb = 500,
+                    MinimumRelevanceScore = 0.5
+                };
             }
 
             // ← ATTACH HANDLERS FIRST (before connecting!)
@@ -478,6 +486,37 @@
             await messageContainer.FocusAsync();
         }
         catch { }
+    }
+
+    /// <summary>
+    /// Retry logic to get retrieval config - waits for API to be ready
+    /// </summary>
+    private async Task<RagApiClient.RetrievalConfigDto?> GetRetrievalConfigWithRetryAsync(int maxRetries = 5, int delayMs = 1000)
+    {
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                Console.WriteLine($"[Home] Attempting to get retrieval config (attempt {i + 1}/{maxRetries})");
+                var config = await ApiClient.GetRetrievalConfigAsync();
+                if (config != null)
+                {
+                    Console.WriteLine("[Home] Successfully retrieved retrieval config");
+                    return config;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Home] Attempt {i + 1} failed: {ex.Message}");
+                if (i < maxRetries - 1)
+                {
+                    await Task.Delay(delayMs);
+                }
+            }
+        }
+
+        Console.WriteLine("[Home] All retry attempts failed, using default config");
+        return null;
     }
 
     public async ValueTask DisposeAsync()
