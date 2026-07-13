@@ -368,10 +368,6 @@ dotnet run
 
 Navigate to `https://localhost:7000` for Swagger UI.
 
-If you use Visual Studio, select the **Multiple Startup** launch profile to start both projects together:
-- **RagAgentApi**: `https://localhost:7000`
-- **RagAgentUI**: `https://localhost:7170`
-
 ### 3. Test the Enhanced API
 
 #### Enhanced Content Ingestion (Recommended)

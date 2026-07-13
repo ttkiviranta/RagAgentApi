@@ -271,8 +271,8 @@ builder.Services.AddCors(options =>
 // Health checks
 builder.Services.AddHealthChecks();
 
-builder.WebHost.UseUrls("https://localhost:7000;http://localhost:5000");
 builder.WebHost.UseKestrel();
+builder.WebHost.UseUrls("https://localhost:7000;http://localhost:5000");
 
 var app = builder.Build();
 
@@ -362,14 +362,11 @@ else
     startupLogger.LogWarning("✗ Swagger UI disabled (not in Development mode)");
 }
 
-Console.WriteLine("======== APP.URLS DEBUG ========");
 var addresses = app.Urls;
-Console.WriteLine($"Addresses count: {addresses.Count()}");
 foreach (var addr in addresses)
     Console.WriteLine($"Listening on: {addr}");
 
 Console.WriteLine("Kestrel endpoints: " + string.Join(", ", app.Urls));
-Console.WriteLine("======== STARTING APP.RUN ========");
 
 app.Run();
 
