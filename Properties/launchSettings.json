@@ -9,6 +9,30 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "applicationUrl": "https://localhost:7000;http://localhost:5000"
+    },
+    "RagAgentUI": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:7170"
+    },
+    "Multiple Startup": {
+      "commandName": "MultiStartupProject",
+      "projects": [
+        {
+          "path": "RagAgentApi.csproj",
+          "name": "RagAgentApi",
+          "shouldStart": true
+        },
+        {
+          "path": "RagAgentUI\\RagAgentUI.csproj",
+          "name": "RagAgentUI",
+          "shouldStart": true
+        }
+      ]
     }
   }
 }
