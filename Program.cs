@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseKestrel();
 
 // Add configuration sources
 builder.Configuration
@@ -271,8 +272,10 @@ builder.Services.AddCors(options =>
 // Health checks
 builder.Services.AddHealthChecks();
 
-builder.WebHost.UseKestrel();
-builder.WebHost.UseUrls("https://localhost:7000;http://localhost:5000");
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenLocalhost(5000);
+});
 
 var app = builder.Build();
 
@@ -280,7 +283,7 @@ var app = builder.Build();
 
 // Global exception handling - captures all unhandled exceptions,
 // logs them to database, and sends email notifications for critical errors
-app.UseGlobalExceptionHandling(); //poistin väliaikaisesti, koska haluan testata miten GlobalExceptionMiddleware toimii ilman DeveloperExceptionPagea
+app.UseGlobalExceptionHandling();
 
 // Enable Swagger always in Development, optionally in Production
 if (app.Environment.IsDevelopment())
@@ -305,8 +308,6 @@ else
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
-
 app.UseCors("AllowBlazorUI");
 
 // Guardrail middleware: validate inputs for RAG endpoints before routing
@@ -321,29 +322,31 @@ app.MapHub<ChatHub>("/chathub"); // SignalR hub mapping
 // Add health check endpoint
 app.MapHealthChecks("/health");
 
-// Startup background task to initialize search index
-_ = Task.Run(async () =>
+app.Lifetime.ApplicationStarted.Register(() =>
 {
-    try
+    _ = Task.Run(async () =>
     {
-        var scope = app.Services.CreateScope();
-        var searchService = scope.ServiceProvider.GetRequiredService<IAzureSearchService>();
-        var seedService = scope.ServiceProvider.GetRequiredService<DatabaseSeedService>();
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var searchService = scope.ServiceProvider.GetRequiredService<IAzureSearchService>();
+            var seedService = scope.ServiceProvider.GetRequiredService<DatabaseSeedService>();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-        logger.LogInformation("Initializing Azure Search index on startup...");
-        await searchService.CreateOrUpdateIndexAsync();
-        logger.LogInformation("Azure Search index initialized successfully");
+            logger.LogInformation("Initializing Azure Search index on startup...");
+            await searchService.CreateOrUpdateIndexAsync();
+            logger.LogInformation("Azure Search index initialized successfully");
 
-        logger.LogInformation("Seeding agent types and URL mappings...");
-        await seedService.SeedAgentTypesAsync();
-        logger.LogInformation("Agent types seeding completed successfully");
-    }
-    catch (Exception ex)
-    {
-        var logger = app.Services.GetRequiredService<ILogger<Program>>();
-        logger.LogWarning(ex, "Failed to initialize services on startup - will retry on first use");
-    }
+            logger.LogInformation("Seeding agent types and URL mappings...");
+            await seedService.SeedAgentTypesAsync();
+            logger.LogInformation("Agent types seeding completed successfully");
+        }
+        catch (Exception ex)
+        {
+            var logger = app.Services.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning(ex, "Failed to initialize services on startup - will retry on first use");
+        }
+    });
 });
 
 // Log application startup
@@ -355,7 +358,7 @@ startupLogger.LogInformation("Blob storage enabled: {BlobStorageEnabled}", blobS
 // Log Swagger status
 if (app.Environment.IsDevelopment())
 {
-    startupLogger.LogInformation("✓ Swagger UI enabled at: {SwaggerUrl}", "https://localhost:7000/swagger");
+    startupLogger.LogInformation("✓ Swagger UI enabled at: {SwaggerUrl}", "http://localhost:5000/swagger");
 }
 else
 {
