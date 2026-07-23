@@ -289,7 +289,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "RAG Agent API v1");
-        options.RoutePrefix = string.Empty; // Serve Swagger at root "/"
+        options.RoutePrefix = "swagger";
         options.DocumentTitle = "RAG Agent API";
         options.DisplayRequestDuration();
         options.DefaultModelsExpandDepth(1);
@@ -355,7 +355,7 @@ startupLogger.LogInformation("Blob storage enabled: {BlobStorageEnabled}", blobS
 // Log Swagger status
 if (app.Environment.IsDevelopment())
 {
-    startupLogger.LogInformation("✓ Swagger UI enabled at: {SwaggerUrl}", "https://localhost:7000");
+    startupLogger.LogInformation("✓ Swagger UI enabled at: {SwaggerUrl}", "https://localhost:7000/swagger");
 }
 else
 {
