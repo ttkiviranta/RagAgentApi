@@ -9,7 +9,10 @@ namespace RagAgentApi.Services.Orchestration;
 
 public interface ILlmOrchestrator
 {
-    Task<AgentResult> ExecuteAsync(AgentContext context, CancellationToken cancellationToken = default);
+    Task<AgentResult> ExecuteAsync(
+        AgentContext context,
+        IReadOnlyDictionary<string, AgentMetadata> agentMetadata,
+        CancellationToken cancellationToken = default);
 }
 
 public class LlmOrchestrator : ILlmOrchestrator
@@ -40,7 +43,10 @@ public class LlmOrchestrator : ILlmOrchestrator
         _errorLogService = errorLogService;
     }
 
-    public async Task<AgentResult> ExecuteAsync(AgentContext context, CancellationToken cancellationToken = default)
+    public async Task<AgentResult> ExecuteAsync(
+        AgentContext context,
+        IReadOnlyDictionary<string, AgentMetadata> agentMetadata,
+        CancellationToken cancellationToken = default)
     {
         if (!context.State.TryGetValue("url", out var urlObj) || urlObj is not string url)
         {
@@ -58,6 +64,19 @@ public class LlmOrchestrator : ILlmOrchestrator
             return AgentResult.CreateFailure("No available agents found for selected agent type pipeline.");
         }
 
+        var availableMetadata = availableAgentNames
+            .Select(name => agentMetadata.TryGetValue(name, out var meta)
+                ? meta
+                : new AgentMetadata
+                {
+                    Name = name,
+                    Description = "No metadata definition available.",
+                    Capabilities = Array.Empty<string>(),
+                    Inputs = Array.Empty<string>(),
+                    Outputs = Array.Empty<string>()
+                })
+            .ToList();
+
         var executionId = await LogPipelineStartAsync(Guid.Parse(context.ThreadId), agentType, availableAgentNames, url, cancellationToken);
 
         var pipelineResults = new List<AgentResult>();
@@ -66,7 +85,12 @@ public class LlmOrchestrator : ILlmOrchestrator
 
         for (int step = 1; step <= maxSteps; step++)
         {
-            var decision = await _plannerService.DecideNextAgentAsync(context, availableAgentNames, llmSteps, cancellationToken);
+            var decision = await _plannerService.DecideNextAgentAsync(
+                context,
+                availableAgentNames,
+                availableMetadata,
+                llmSteps,
+                cancellationToken);
 
             if (decision.Done)
             {
@@ -150,7 +174,13 @@ public class LlmOrchestrator : ILlmOrchestrator
                         agentResult.Errors);
                 }
 
-                var evaluation = await _plannerService.EvaluateStepAsync(context, executedStep, availableAgentNames, llmSteps, cancellationToken);
+                var evaluation = await _plannerService.EvaluateStepAsync(
+                    context,
+                    executedStep,
+                    availableAgentNames,
+                    availableMetadata,
+                    llmSteps,
+                    cancellationToken);
                 if (evaluation.Done)
                 {
                     await LogPipelineCompleteAsync(executionId, true, "LLM orchestration completed", pipelineResults, cancellationToken);

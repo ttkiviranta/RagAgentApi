@@ -4,6 +4,7 @@ using RagAgentApi.Services.DemoServices;
 using RagAgentApi.Services.A2A;
 using RagAgentApi.Services.Orchestration;
 using RagAgentApi.Options;
+using RagAgentApi.Models;
 using RagAgentApi.Filters;
 using RagAgentApi.Data;
 using RagAgentApi.Hubs;
@@ -140,6 +141,7 @@ builder.Services.AddScoped<RagAgentApi.Services.Retrieval.RagRetrievalStrategy>(
 builder.Services.AddScoped<RagAgentApi.Services.Retrieval.FileFirstRetrievalStrategy>();
 builder.Services.AddScoped<RagAgentApi.Services.Retrieval.AutoRetrievalStrategy>();
 builder.Services.AddScoped<RagAgentApi.Services.Retrieval.RetrievalStrategyFactory>();
+builder.Services.AddSingleton<IReadOnlyDictionary<string, AgentMetadata>>(_ => AgentMetadataDefinitions.Create());
 builder.Services.AddScoped<ILlmPlannerService, LlmPlannerService>();
 builder.Services.AddScoped<IPipelineOrchestrator, PipelineOrchestrator>();
 builder.Services.AddScoped<ILlmOrchestrator, LlmOrchestrator>();

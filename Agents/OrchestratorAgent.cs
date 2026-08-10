@@ -11,11 +11,13 @@ public class OrchestratorAgent : BaseRagAgent
     private readonly OrchestrationOptions _orchestrationOptions;
     private readonly IPipelineOrchestrator _pipelineOrchestrator;
     private readonly ILlmOrchestrator _llmOrchestrator;
+    private readonly IReadOnlyDictionary<string, AgentMetadata> _agentMetadata;
 
     public OrchestratorAgent(
         IOptions<OrchestrationOptions> orchestrationOptions,
         IPipelineOrchestrator pipelineOrchestrator,
         ILlmOrchestrator llmOrchestrator,
+        IReadOnlyDictionary<string, AgentMetadata> agentMetadata,
         ILogger<OrchestratorAgent> logger,
         IErrorLogService? errorLogService = null)
         : base(logger, errorLogService)
@@ -23,6 +25,7 @@ public class OrchestratorAgent : BaseRagAgent
         _orchestrationOptions = orchestrationOptions.Value;
         _pipelineOrchestrator = pipelineOrchestrator;
         _llmOrchestrator = llmOrchestrator;
+        _agentMetadata = agentMetadata;
     }
 
     public override string Name => "OrchestratorAgent";
@@ -40,7 +43,7 @@ public class OrchestratorAgent : BaseRagAgent
 
             AgentResult result = mode switch
             {
-                OrchestrationMode.LLM => await _llmOrchestrator.ExecuteAsync(context, cancellationToken),
+                OrchestrationMode.LLM => await _llmOrchestrator.ExecuteAsync(context, _agentMetadata, cancellationToken),
                 OrchestrationMode.Pipeline => await _pipelineOrchestrator.ExecuteAsync(context, cancellationToken),
                 _ => await _pipelineOrchestrator.ExecuteAsync(context, cancellationToken)
             };

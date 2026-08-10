@@ -43,7 +43,7 @@ public class OrchestratorAgentDualModeIntegrationTests
         result.Success.Should().BeTrue();
         result.Message.Should().Be("pipeline");
         pipelineMock.Verify(x => x.ExecuteAsync(context, It.IsAny<CancellationToken>()), Times.Once);
-        llmMock.Verify(x => x.ExecuteAsync(It.IsAny<AgentContext>(), It.IsAny<CancellationToken>()), Times.Never);
+        llmMock.Verify(x => x.ExecuteAsync(It.IsAny<AgentContext>(), It.IsAny<IReadOnlyDictionary<string, AgentMetadata>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class OrchestratorAgentDualModeIntegrationTests
         // Assert
         result.Success.Should().BeTrue();
         result.Message.Should().Be("llm");
-        llmMock.Verify(x => x.ExecuteAsync(context, It.IsAny<CancellationToken>()), Times.Once);
+        llmMock.Verify(x => x.ExecuteAsync(context, It.IsAny<IReadOnlyDictionary<string, AgentMetadata>>(), It.IsAny<CancellationToken>()), Times.Once);
         pipelineMock.Verify(x => x.ExecuteAsync(It.IsAny<AgentContext>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -89,8 +89,10 @@ public class OrchestratorAgentDualModeIntegrationTests
 
         var llmMock = new Mock<ILlmOrchestrator>();
         llmMock
-            .Setup(x => x.ExecuteAsync(It.IsAny<AgentContext>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.ExecuteAsync(It.IsAny<AgentContext>(), It.IsAny<IReadOnlyDictionary<string, AgentMetadata>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(AgentResult.CreateSuccess("llm"));
+
+        var metadata = AgentMetadataDefinitions.Create();
 
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
@@ -98,6 +100,7 @@ public class OrchestratorAgentDualModeIntegrationTests
 
         services.AddSingleton(pipelineMock);
         services.AddSingleton(llmMock);
+        services.AddSingleton<IReadOnlyDictionary<string, AgentMetadata>>(metadata);
         services.AddSingleton<IPipelineOrchestrator>(sp => sp.GetRequiredService<Mock<IPipelineOrchestrator>>().Object);
         services.AddSingleton<ILlmOrchestrator>(sp => sp.GetRequiredService<Mock<ILlmOrchestrator>>().Object);
 

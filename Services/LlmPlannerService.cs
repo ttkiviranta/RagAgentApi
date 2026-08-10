@@ -9,6 +9,7 @@ public interface ILlmPlannerService
     Task<LlmPlannerDecision> DecideNextAgentAsync(
         AgentContext context,
         IReadOnlyList<string> availableAgents,
+        IReadOnlyList<AgentMetadata> availableAgentMetadata,
         IReadOnlyList<LlmExecutionStep> completedSteps,
         CancellationToken cancellationToken = default);
 
@@ -16,6 +17,7 @@ public interface ILlmPlannerService
         AgentContext context,
         LlmExecutionStep executedStep,
         IReadOnlyList<string> availableAgents,
+        IReadOnlyList<AgentMetadata> availableAgentMetadata,
         IReadOnlyList<LlmExecutionStep> completedSteps,
         CancellationToken cancellationToken = default);
 }
@@ -39,6 +41,7 @@ public class LlmPlannerService : ILlmPlannerService
     public async Task<LlmPlannerDecision> DecideNextAgentAsync(
         AgentContext context,
         IReadOnlyList<string> availableAgents,
+        IReadOnlyList<AgentMetadata> availableAgentMetadata,
         IReadOnlyList<LlmExecutionStep> completedSteps,
         CancellationToken cancellationToken = default)
     {
@@ -52,7 +55,7 @@ public class LlmPlannerService : ILlmPlannerService
             };
         }
 
-        var prompt = BuildDecisionPrompt(context, availableAgents, completedSteps);
+        var prompt = BuildDecisionPrompt(context, availableAgents, availableAgentMetadata, completedSteps);
 
         try
         {
@@ -86,10 +89,11 @@ public class LlmPlannerService : ILlmPlannerService
         AgentContext context,
         LlmExecutionStep executedStep,
         IReadOnlyList<string> availableAgents,
+        IReadOnlyList<AgentMetadata> availableAgentMetadata,
         IReadOnlyList<LlmExecutionStep> completedSteps,
         CancellationToken cancellationToken = default)
     {
-        var prompt = BuildEvaluationPrompt(context, executedStep, availableAgents, completedSteps);
+        var prompt = BuildEvaluationPrompt(context, executedStep, availableAgents, availableAgentMetadata, completedSteps);
 
         try
         {
@@ -122,6 +126,7 @@ public class LlmPlannerService : ILlmPlannerService
     private static string BuildDecisionPrompt(
         AgentContext context,
         IReadOnlyList<string> availableAgents,
+        IReadOnlyList<AgentMetadata> availableAgentMetadata,
         IReadOnlyList<LlmExecutionStep> completedSteps)
     {
         var sb = new StringBuilder();
@@ -133,6 +138,17 @@ public class LlmPlannerService : ILlmPlannerService
         sb.AppendLine("- done=true when the task is complete.");
         sb.AppendLine("- nextAgent must be one of availableAgents when done=false.");
         sb.AppendLine("- If uncertain, choose the safest next agent.");
+        sb.AppendLine();
+        sb.AppendLine("Available agents: ");
+        sb.AppendLine(JsonSerializer.Serialize(availableAgentMetadata.Select(m => new
+        {
+            m.Name,
+            m.Description,
+            m.Capabilities,
+            m.Inputs,
+            m.Outputs
+        })));
+        sb.AppendLine("Based on the user goal and current context, decide which agent should run next.");
         sb.AppendLine();
         sb.AppendLine("Context:");
         sb.AppendLine(JsonSerializer.Serialize(new
@@ -157,6 +173,7 @@ public class LlmPlannerService : ILlmPlannerService
         AgentContext context,
         LlmExecutionStep executedStep,
         IReadOnlyList<string> availableAgents,
+        IReadOnlyList<AgentMetadata> availableAgentMetadata,
         IReadOnlyList<LlmExecutionStep> completedSteps)
     {
         var sb = new StringBuilder();
@@ -167,6 +184,16 @@ public class LlmPlannerService : ILlmPlannerService
         sb.AppendLine("Rules:");
         sb.AppendLine("- done=true only when the user request is fully satisfied.");
         sb.AppendLine("- done=false when additional agent steps are required.");
+        sb.AppendLine();
+        sb.AppendLine("Available agents: ");
+        sb.AppendLine(JsonSerializer.Serialize(availableAgentMetadata.Select(m => new
+        {
+            m.Name,
+            m.Description,
+            m.Capabilities,
+            m.Inputs,
+            m.Outputs
+        })));
         sb.AppendLine();
         sb.AppendLine("Context:");
         sb.AppendLine(JsonSerializer.Serialize(new
