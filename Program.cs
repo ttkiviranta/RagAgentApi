@@ -2,6 +2,8 @@ using RagAgentApi.Agents;
 using RagAgentApi.Services;
 using RagAgentApi.Services.DemoServices;
 using RagAgentApi.Services.A2A;
+using RagAgentApi.Services.Orchestration;
+using RagAgentApi.Options;
 using RagAgentApi.Filters;
 using RagAgentApi.Data;
 using RagAgentApi.Hubs;
@@ -132,10 +134,15 @@ if (!string.IsNullOrWhiteSpace(serviceBusConnectionString))
 // Retrieval Strategies
 builder.Services.Configure<RagAgentApi.Services.Retrieval.RetrievalSettings>(
     builder.Configuration.GetSection("Retrieval"));
+builder.Services.Configure<OrchestrationOptions>(
+    builder.Configuration.GetSection("Orchestration"));
 builder.Services.AddScoped<RagAgentApi.Services.Retrieval.RagRetrievalStrategy>();
 builder.Services.AddScoped<RagAgentApi.Services.Retrieval.FileFirstRetrievalStrategy>();
 builder.Services.AddScoped<RagAgentApi.Services.Retrieval.AutoRetrievalStrategy>();
 builder.Services.AddScoped<RagAgentApi.Services.Retrieval.RetrievalStrategyFactory>();
+builder.Services.AddScoped<ILlmPlannerService, LlmPlannerService>();
+builder.Services.AddScoped<IPipelineOrchestrator, PipelineOrchestrator>();
+builder.Services.AddScoped<ILlmOrchestrator, LlmOrchestrator>();
 
 // Log retrieval mode and blob storage at startup
 var retrievalMode = builder.Configuration.GetValue<string>("Retrieval:Mode", "Rag");

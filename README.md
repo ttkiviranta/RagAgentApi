@@ -10,7 +10,7 @@ The API implements an **enhanced multi-agent architecture** where specialized ag
 ![Multi-Agent System with Dynamic Selection](docs/images/multi-agent-system.png)
 
 #### Core Pipeline Agents
-- **OrchestratorAgent**: **Enhanced** coordinator with dynamic agent selection and pipeline execution
+- **OrchestratorAgent**: **Enhanced** coordinator with **dual orchestration modes** (deterministic Pipeline or LLM-driven)
 - **ScraperAgent**: Extracts and cleans content from web URLs using HtmlAgilityPack
 - **ChunkerAgent**: Intelligently splits content into overlapping chunks with sentence boundary preservation
 - **EmbeddingAgent**: Generates vector embeddings using Azure OpenAI text-embedding-ada-002
@@ -37,6 +37,16 @@ The API implements an **enhanced multi-agent architecture** where specialized ag
 - **AgentSelectorService**: **NEW** - Automatically selects optimal agent based on URL patterns
 - **AgentFactory**: **NEW** - Dynamically creates agent pipelines from database configuration
 - **URL Pattern Matching**: Regex-based routing (GitHub → GitHub agent, YouTube → YouTube agent, etc.)
+
+### Dual-Mode Orchestration
+- **Pipeline Mode** (`Orchestration:Mode = Pipeline`):
+  - Uses deterministic, sequential orchestration.
+  - Preserves the existing orchestration pipeline behavior.
+- **LLM Mode** (`Orchestration:Mode = LLM`):
+  - Uses an LLM planning loop for dynamic orchestration decisions.
+  - Execution pattern: **decide next agent → execute agent → evaluate result → continue until done**.
+
+This mode is fully configuration-driven and can be switched without code changes.
 
 ## 🧱 Architecture Overview
 
@@ -221,6 +231,50 @@ cp appsettings.Development.json.template appsettings.Development.json
   },
   "RagSettings": {
     "Mode": "hybrid"
+  },
+  "Orchestration": {
+    "Mode": "Pipeline"
+  }
+}
+```
+
+### Orchestration Modes
+
+The orchestrator supports two runtime-selectable modes:
+
+| Mode | Description | Typical Use Case |
+|------|-------------|------------------|
+| **Pipeline** | Deterministic orchestration with fixed pipeline execution | Stable production workflows and predictable behavior |
+| **LLM** | LLM-driven orchestration loop (planner decides each next step) | Experimental/adaptive workflows and dynamic routing |
+
+#### Configuration
+
+Default mode in `appsettings.json`:
+
+```json
+{
+  "Orchestration": {
+    "Mode": "Pipeline"
+  }
+}
+```
+
+Development override in `appsettings.Development.json`:
+
+```json
+{
+  "Orchestration": {
+    "Mode": "LLM"
+  }
+}
+```
+
+Production override example in `appsettings.Production.json`:
+
+```json
+{
+  "Orchestration": {
+    "Mode": "Pipeline"
   }
 }
 ```

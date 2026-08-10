@@ -39,6 +39,28 @@ I've successfully added **optional support for Qwen 2.5 models** to your RAG Age
 
 ## 🚀 How It Works
 
+### Orchestration Mode Integration (New)
+
+Qwen/OpenAI-compatible provider support now also plugs into **LLM-driven orchestration**.
+
+- `Orchestration:Mode = Pipeline` keeps deterministic orchestration.
+- `Orchestration:Mode = LLM` enables planner-based orchestration where the LLM decides each next agent step.
+
+Configuration example:
+
+```json
+{
+  "Orchestration": {
+    "Mode": "LLM"
+  },
+  "LlmProviders": {
+    "Default": "OpenAICompatible"
+  }
+}
+```
+
+This means provider switching (`AzureOpenAI` vs `OpenAICompatible`) and orchestration mode switching (`Pipeline` vs `LLM`) are both configuration-driven.
+
 ### 1. Configuration-Driven Provider Selection
 ```json
 {
