@@ -30,7 +30,8 @@ public class AgentFactory
    { "StorageAgent", typeof(StorageAgent) },
           { "PostgresStorageAgent", typeof(PostgresStorageAgent) },
             { "QueryAgent", typeof(QueryAgent) },
-     { "PostgresQueryAgent", typeof(PostgresQueryAgent) },
+             { "PostgresQueryAgent", typeof(PostgresQueryAgent) },
+             { "GraphRagAgent", typeof(GraphRagAgent) },
 
       // Specialized agents
        { "GitHubApiAgent", typeof(GitHubApiAgent) },

@@ -23,6 +23,10 @@ public class RagDbContext : DbContext
     public DbSet<AgentType> AgentTypes { get; set; }
     public DbSet<UrlAgentMapping> UrlAgentMappings { get; set; }
 
+    // GraphRAG knowledge graph
+    public DbSet<Models.PostgreSQL.Concept> Concepts { get; set; }
+    public DbSet<Models.PostgreSQL.Relation> Relations { get; set; }
+
     // Demo Services
     public DbSet<DemoExecution> DemoExecutions { get; set; }
     public DbSet<DemoTestData> DemoTestData { get; set; }
@@ -208,6 +212,41 @@ public class RagDbContext : DbContext
       .HasForeignKey(e => e.AgentTypeId)
          .OnDelete(DeleteBehavior.Cascade);
       });
+
+        // Configure GraphRAG entities
+        modelBuilder.Entity<Models.PostgreSQL.Concept>(entity =>
+        {
+            entity.HasIndex(e => e.Name)
+                .IsUnique()
+                .HasDatabaseName("IX_Concepts_Name");
+
+            entity.Property(e => e.Metadata)
+                .HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<Models.PostgreSQL.Relation>(entity =>
+        {
+            entity.HasIndex(e => new { e.SourceConceptId, e.TargetConceptId })
+                .HasDatabaseName("IX_Relations_Source_Target");
+
+            entity.Property(e => e.Metadata)
+                .HasColumnType("jsonb");
+
+            entity.HasOne(e => e.SourceConcept)
+                .WithMany(c => c.OutgoingRelations)
+                .HasForeignKey(e => e.SourceConceptId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.TargetConcept)
+                .WithMany(c => c.IncomingRelations)
+                .HasForeignKey(e => e.TargetConceptId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne<Models.PostgreSQL.Document>()
+                .WithMany()
+                .HasForeignKey("DocumentId")
+                .OnDelete(DeleteBehavior.SetNull);
+        });
 
         // Configure DemoExecution entity
         modelBuilder.Entity<DemoExecution>(entity =>

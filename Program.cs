@@ -1,5 +1,6 @@
 using RagAgentApi.Agents;
 using RagAgentApi.Services;
+using RagAgentApi.Services.GraphRag;
 using RagAgentApi.Services.DemoServices;
 using RagAgentApi.Services.A2A;
 using RagAgentApi.Services.Orchestration;
@@ -119,6 +120,12 @@ builder.Services.AddScoped<ConversationService>();
 builder.Services.AddScoped<AgentSelectorService>();
 builder.Services.AddScoped<AgentFactory>();
 builder.Services.AddScoped<DatabaseSeedService>();
+
+// GraphRAG services and agent (separate module)
+builder.Services.AddScoped<GraphRetriever>();
+builder.Services.AddScoped<GraphRagPipeline>();
+// Register agent implementation so it can be used by AgentFactory or invoked directly
+builder.Services.AddScoped<GraphRagAgent>();
 
 // Azure Blob Storage
 builder.Services.Configure<RagAgentApi.Services.BlobStorageSettings>(

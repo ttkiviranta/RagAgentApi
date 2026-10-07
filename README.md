@@ -979,6 +979,54 @@ Current specialized agents are **placeholder implementations** and require addit
 - Advanced citation tracking and cross-referencing
 - Real-time content monitoring and updates
 
+## GraphRAG Feature
+
+GraphRAG (Graph-based Retrieval-Augmented Generation) augments the existing vector-search RAG pipeline by leveraging a lightweight knowledge graph of concepts and relations. It uses an LLM to extract seed concepts from the user question, traverses the graph to find related concepts and associated documents, merges those results with standard vector-retrieval snippets, and builds a unified context for the LLM to generate a concise, source-cited answer.
+
+Key points
+- Combines symbolic knowledge (concept nodes + relations) with vector search for improved precision and grounding.
+- Graph schema: Concept (Id, Name, Description, Metadata) and Relation (SourceConceptId, TargetConceptId, RelationType, Weight, optional DocumentId, Metadata).
+- Implemented as a separate module (Services/GraphRag) and a new agent (Agents/GraphRagAgent) so the existing agents and pipelines are unchanged.
+
+Architecture overview
+- Components added:
+  - GraphRetriever: uses the configured LLM to extract seed concepts and performs BFS traversal of the knowledge graph to collect related concepts and linked documents.
+  - GraphRagPipeline: merges graph retrieval results with vector search snippets and constructs the final prompt/context for the LLM.
+  - GraphRagAgent: orchestrates embedding-based vector search + graph retrieval + prompt construction + final LLM call and stores the result in Conversation.
+- Persistence: Concept and Relation tables are added to the existing PostgreSQL schema (pgvector-enabled).
+
+Usage and setup
+1) Apply database migration
+   - From the repository root run in PowerShell:
+     dotnet ef database update
+   This creates the Concepts and Relations tables (migration: AddGraphRAGConcepts).
+
+2) Seed the knowledge graph
+   - You can insert initial concepts and relations using SQL or by extending DatabaseSeedService to add seed rows. Example SQL:
+     INSERT INTO "Concepts" ("Id","Name","Description") VALUES ('00000000-0000-0000-0000-000000000001','Entity Extraction','Concepts about entity extraction');
+     INSERT INTO "Relations" ("Id","SourceConceptId","TargetConceptId","RelationType") VALUES ('00000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','related');
+
+3) Services & DI
+   - The new services and agent are registered in Program.cs (GraphRetriever, GraphRagPipeline, GraphRagAgent). No additional DI changes are required.
+
+4) Invoke the GraphRAG agent (programmatically)
+   - Example:
+     var context = new RagAgentApi.Models.AgentContext();
+     context.State["query"] = "What is semantic search and related techniques?";
+     var graphAgent = serviceProvider.GetRequiredService<RagAgentApi.Agents.GraphRagAgent>();
+     var result = await graphAgent.ExecuteAsync(context);
+     // result contains 'query_result_graph' in context.State with answer and sources
+
+   - Alternatively, create the agent via AgentFactory:
+     var agent = agentFactory.CreateAgent("GraphRagAgent");
+     await agent.ExecuteAsync(context);
+
+5) HTTP/API usage
+   - The GraphRagAgent integrates with existing conversation persistence and orchestrator. You can call it through your usual orchestration flow by selecting or registering an AgentType whose pipeline includes "GraphRagAgent".
+
+Notes
+- The feature is implemented as an independent module and does not modify existing agents or pipelines. It merges vector and graph signals to produce a unified LLM prompt that prefers graph-linked documents when citing sources.
+
 ### Additional Future Enhancements
 
 **LLM Observability Dashboard**  
