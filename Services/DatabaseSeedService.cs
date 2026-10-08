@@ -21,12 +21,13 @@ public class DatabaseSeedService
 
     /// <summary>
  /// Seed initial agent types and URL mappings
-    /// </summary>
-    public async Task SeedAgentTypesAsync()
-    {
-        try
-    {
-            _logger.LogInformation("Starting agent types seeding...");
+ /// </summary>
+public async Task SeedAgentTypesAsync()
+{
+    try
+{
+        _logger.LogInformation("Starting agent types seeding...");
+
 
       // Check if already seeded
     if (await _context.AgentTypes.AnyAsync())
@@ -139,6 +140,13 @@ public class DatabaseSeedService
              CreatedAt = DateTime.UtcNow
         });
 
+            // Save URL mappings
+            _context.UrlAgentMappings.AddRange(urlMappings);
+            await _context.SaveChangesAsync();
+
+            // Continue with graph seeding if needed (moved to after initial seeding)
+
+
       // GitHub patterns (highest priority)
             urlMappings.Add(new UrlAgentMapping
           {
@@ -242,16 +250,96 @@ IsActive = true,
 
   _logger.LogInformation("Created {Count} URL mappings", urlMappings.Count);
          _logger.LogInformation("Agent types seeding completed successfully");
-      }
-        catch (Exception ex)
-        {
-          _logger.LogError(ex, "Failed to seed agent types");
-   throw;
-        }
-    }
 
-    /// <summary>
-    /// Get seeding status
+         // Also seed GraphRAG knowledge graph if empty
+         try
+         {
+             _logger.LogInformation("Seeding GraphRAG concepts and relations...");
+             await SeedGraphAsync();
+             _logger.LogInformation("GraphRAG seeding completed successfully");
+         }
+         catch (Exception ex)
+         {
+             _logger.LogWarning(ex, "Failed to seed GraphRAG data on startup");
+         }
+               }
+           catch (Exception ex)
+           {
+             _logger.LogError(ex, "Failed to seed agent types");
+      throw;
+           }
+       }
+
+       /// <summary>
+       /// Seed a small example knowledge graph for GraphRAG (Concepts and Relations)
+       /// </summary>
+       public async Task SeedGraphAsync()
+       {
+           try
+           {
+               if (await _context.Set<Models.PostgreSQL.Concept>().AnyAsync())
+               {
+                   _logger.LogInformation("GraphRAG data already exists, skipping seed");
+                   return;
+               }
+
+               // Example concepts
+               var cEntityExtraction = new Models.PostgreSQL.Concept
+               {
+                   Name = "Entity Extraction",
+                   Description = "Techniques and tools for extracting named entities from text",
+                   Metadata = JsonDocument.Parse("{}")
+               };
+
+               var cSemanticSearch = new Models.PostgreSQL.Concept
+               {
+                   Name = "Semantic Search",
+                   Description = "Search using vector embeddings and semantic similarity",
+                   Metadata = JsonDocument.Parse("{}")
+               };
+
+               var cEmbeddings = new Models.PostgreSQL.Concept
+               {
+                   Name = "Embeddings",
+                   Description = "Vector representations of text used for similarity and retrieval",
+                   Metadata = JsonDocument.Parse("{}")
+               };
+
+               _context.AddRange(cEntityExtraction, cSemanticSearch, cEmbeddings);
+               await _context.SaveChangesAsync();
+
+               // Relations
+               var r1 = new Models.PostgreSQL.Relation
+               {
+                   SourceConceptId = cEntityExtraction.Id,
+                   TargetConceptId = cSemanticSearch.Id,
+                   RelationType = "enables",
+                   Weight = 1.0,
+                   Metadata = JsonDocument.Parse("{}")
+               };
+
+               var r2 = new Models.PostgreSQL.Relation
+               {
+                   SourceConceptId = cEmbeddings.Id,
+                   TargetConceptId = cSemanticSearch.Id,
+                   RelationType = "underpins",
+                   Weight = 1.0,
+                   Metadata = JsonDocument.Parse("{}")
+               };
+
+               _context.AddRange(r1, r2);
+               await _context.SaveChangesAsync();
+
+               _logger.LogInformation("Seeded {Concepts} concepts and {Relations} relations", 3, 2);
+           }
+           catch (Exception ex)
+           {
+               _logger.LogWarning(ex, "Failed to seed GraphRAG example data");
+           }
+       }
+
+       /// <summary>
+       /// Get seeding status
     /// </summary>
     public async Task<SeedingStatus> GetSeedingStatusAsync()
     {
